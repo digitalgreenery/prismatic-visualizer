@@ -3,18 +3,18 @@
 //! This example demonstrates the built-in 3d shapes in Bevy.
 //! The scene includes a patterned texture and a rotation for visualizing the normals and UVs.
 
-use std::f32::consts::PI;
+use std::{f32::consts::PI};
 
 use bevy::{
-    prelude::{*, system_adapter::new},
+    prelude::{*},
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
-        .add_systems(Startup, setup)
-        .add_systems(Update, (system, rotate))
+        .add_systems(Startup, (setup))
+        .add_systems(Update, (toggle_camera_rotation, rotate, draw_spherical_colorspace))
         .run();
 }
 
@@ -51,7 +51,7 @@ fn setup(
                 transform: Transform::from_xyz(
                     -X_EXTENT / 2. + i as f32 / (num_shapes - 1) as f32 * X_EXTENT,
                     2.0,
-                    0.0,
+                    10.0,
                 )
                 .with_rotation(Quat::from_rotation_x(-PI / 4.)),
                 ..default()
@@ -67,7 +67,7 @@ fn setup(
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(8.0, 16.0, 8.0),
+        transform: Transform::from_xyz(8.0, 16.0, 10.0),
         ..default()
     });
 
@@ -82,26 +82,84 @@ fn setup(
         transform: Transform::from_xyz(0., 6., 12.).looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
         ..default()
     });
+
+    commands.insert_resource(ToggleCameraRotation(false));
+ 
 }
 
-fn rotate(mut query: Query<&mut Transform, With<Shape>>, time: Res<Time>) {
+fn rotate(mut query: Query<&mut Transform, With<Shape>>, 
+    mut camera_query: Query<&mut Transform, (With<Camera>, Without<Shape>)>, 
+    camera_rotation: Res<ToggleCameraRotation>,
+    keyboard: Res<Input<KeyCode>>, 
+    time: Res<Time>) {
+    
     for mut transform in &mut query {
         transform.rotate_y(time.delta_seconds() / 2.);
     }
+
+    for mut camera_transform in &mut camera_query {
+
+        // Define the camera's rotation speed in radians per second
+        let camera_rotation_speed_horizontal = 
+            if camera_rotation.0 || keyboard.pressed(KeyCode::Right){
+                0.5
+            }
+            else if keyboard.pressed(KeyCode::Left) {
+                -0.5
+            }
+            else {
+                0.0
+        };
+
+        let camera_speed_vertical =
+        if keyboard.pressed(KeyCode::Up){
+            2.0
+        }
+        else if keyboard.pressed(KeyCode::Down) {
+            -2.0
+        }
+        else {
+            0.0
+        };
+
+        // Calculate the camera's rotation angle based on time and speed
+        let camera_rotation_angle_horizontal = time.delta_seconds() * camera_rotation_speed_horizontal;
+        let camera_vertical = time.delta_seconds() * camera_speed_vertical;
+
+        camera_transform.rotate_around(Vec3::new(0., 0., 0.), Quat::from_rotation_y(camera_rotation_angle_horizontal));
+        camera_transform.translation.y += camera_vertical;
+        camera_transform.look_at(Vec3::new(0., 1., 0.), Vec3::Y)
+    }
+    
 }
 
-fn system(mut gizmos: Gizmos, time: Res<Time>){
+fn draw_spherical_colorspace(mut gizmos: Gizmos){
     let scale = 5.;
-    let step = 20;
-    let mut prev_color = (1.,0.,0.);
+    let mut prev_color = (0.,0.,0.);
 
-    for v in 0..step {
-        for s in 0..step {
-            for h in  1..(5*step){
-                let new_color= hsv_spherical_rgb(h as f32 /(5.0*step as f32), s as f32 /step as f32, v as f32 /step as f32);
-                gizmos.line(  Vec3::new(prev_color.0*scale,prev_color.1*scale,prev_color.2*scale),
-                                Vec3::new(new_color.0*scale,new_color.1*scale,new_color.2*scale), 
-                                Color::RgbaLinear { red: (prev_color.0), green: (prev_color.1), blue: (prev_color.2), alpha: (1.) });
+    let h_step = 24;
+    let s_step = 240;
+    let v_step = 12;
+
+    let xyz_offset = (1.,0.,0.);
+
+    for v in 0..v_step {
+        for s in 0..(s_step/(v_step-v)) {
+            for h in  0..h_step{
+                let new_color= hsv_spherical_rgb(h as f32 / (h_step) as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
+                if !(s==0&&h==0) {
+                    gizmos.line(
+                  Vec3::new(prev_color.0*scale+xyz_offset.0,
+                                  prev_color.1*scale+xyz_offset.1,
+                                  prev_color.2*scale+xyz_offset.2
+                                            ),
+                    Vec3::new(new_color.0*scale+xyz_offset.0,
+                                  new_color.1*scale+xyz_offset.1,
+                                  new_color.2*scale+xyz_offset.2
+                                    ), 
+                        Color::RgbaLinear { red: (prev_color.0), green: (prev_color.1), blue: (prev_color.2), alpha: (1.) });
+                }
+                
                 prev_color = new_color;
             }
         }
@@ -167,5 +225,15 @@ fn hsv_spherical_rgb(h: f32, s: f32, v: f32) -> (f32,f32,f32){
     }    
 }
 
+struct ToggleCameraRotation(bool);
+impl bevy::prelude::Resource for ToggleCameraRotation {}
 
-
+fn toggle_camera_rotation(
+    mut toggle_camera_rotation: ResMut<ToggleCameraRotation>,
+    keyboard_input: Res<Input<KeyCode>>,
+) {
+    // Toggle time-based rotation on/off when Space is pressed
+    if keyboard_input.just_pressed(KeyCode::Space) {
+        toggle_camera_rotation.0 = !toggle_camera_rotation.0;
+    }
+}
