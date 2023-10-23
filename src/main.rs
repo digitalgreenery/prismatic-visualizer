@@ -1,9 +1,7 @@
-
-
 //! This example demonstrates the built-in 3d shapes in Bevy.
 //! The scene includes a patterned texture and a rotation for visualizing the normals and UVs.
 
-use std::{f32::consts::PI};
+use std::f32::consts::PI;
 
 use bevy::{
     prelude::{*},
@@ -14,7 +12,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_systems(Startup, (setup))
-        .add_systems(Update, (toggle_camera_rotation, rotate, draw_spherical_colorspace))
+        .add_systems(Update, (rotate, draw_spherical_colorspace))
         .run();
 }
 
@@ -50,8 +48,8 @@ fn setup(
                 material: debug_material.clone(),
                 transform: Transform::from_xyz(
                     -X_EXTENT / 2. + i as f32 / (num_shapes - 1) as f32 * X_EXTENT,
-                    2.0,
-                    10.0,
+                    7.0,
+                    1.0,
                 )
                 .with_rotation(Quat::from_rotation_x(-PI / 4.)),
                 ..default()
@@ -67,7 +65,7 @@ fn setup(
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(8.0, 16.0, 10.0),
+        transform: Transform::from_xyz(8.0, 16.0, 16.0),
         ..default()
     });
 
@@ -75,21 +73,21 @@ fn setup(
     commands.spawn(PbrBundle {
         mesh: meshes.add(shape::Plane::from_size(50.0).into()),
         material: materials.add(Color::SILVER.into()),
+        transform: Transform::from_xyz(0.,0.,-0.1).with_rotation( Quat::from_rotation_x(PI/2.)),
         ..default()
     });
-
     commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0., 6., 12.).looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
+        transform: Transform::from_xyz(0., 6., 6.).looking_at(Vec3::new(0., 0., 6.), Vec3::Z),
         ..default()
     });
 
-    commands.insert_resource(ToggleCameraRotation(false));
+    // commands.insert_resource(ToggleCameraRotation(false));
  
 }
 
 fn rotate(mut query: Query<&mut Transform, With<Shape>>, 
     mut camera_query: Query<&mut Transform, (With<Camera>, Without<Shape>)>, 
-    camera_rotation: Res<ToggleCameraRotation>,
+    // camera_rotation: Res<ToggleCameraRotation>,
     keyboard: Res<Input<KeyCode>>, 
     time: Res<Time>) {
     
@@ -99,36 +97,80 @@ fn rotate(mut query: Query<&mut Transform, With<Shape>>,
 
     for mut camera_transform in &mut camera_query {
 
+        let boost = if keyboard.pressed(KeyCode::ShiftLeft) {2.} else {0.};
+        let speed = 2. + boost;
+
         // Define the camera's rotation speed in radians per second
         let camera_rotation_speed_horizontal = 
-            if camera_rotation.0 || keyboard.pressed(KeyCode::Right){
-                0.5
+            if keyboard.pressed(KeyCode::Q)||keyboard.pressed(KeyCode::Left){
+                speed
             }
-            else if keyboard.pressed(KeyCode::Left) {
-                -0.5
+            else if keyboard.pressed(KeyCode::E)||keyboard.pressed(KeyCode::Right) {
+                -speed
+            }
+            else {
+                0.0
+        };
+
+        let camera_rotation_speed_vertical = 
+            if keyboard.pressed(KeyCode::R)||keyboard.pressed(KeyCode::Up){
+                speed
+            }
+            else if keyboard.pressed(KeyCode::F)||keyboard.pressed(KeyCode::Down) {
+                -speed
+            }
+            else {
+                0.0
+        };
+
+        let camera_speed_horizontal = 
+            if keyboard.pressed(KeyCode::D){
+                speed
+            }
+            else if keyboard.pressed(KeyCode::A) {
+                -speed
+            }
+            else {
+                0.0
+        };
+
+        let camera_speed_forward = 
+            if keyboard.pressed(KeyCode::W){
+                speed
+            }
+            else if keyboard.pressed(KeyCode::S) {
+                -speed
             }
             else {
                 0.0
         };
 
         let camera_speed_vertical =
-        if keyboard.pressed(KeyCode::Up){
-            2.0
+        if keyboard.pressed(KeyCode::Space){
+            speed
         }
-        else if keyboard.pressed(KeyCode::Down) {
-            -2.0
+        else if keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::C) {
+            -speed
         }
         else {
             0.0
         };
 
-        // Calculate the camera's rotation angle based on time and speed
-        let camera_rotation_angle_horizontal = time.delta_seconds() * camera_rotation_speed_horizontal;
-        let camera_vertical = time.delta_seconds() * camera_speed_vertical;
+        let time_delta = time.delta_seconds();
 
-        camera_transform.rotate_around(Vec3::new(0., 0., 0.), Quat::from_rotation_y(camera_rotation_angle_horizontal));
-        camera_transform.translation.y += camera_vertical;
-        camera_transform.look_at(Vec3::new(0., 1., 0.), Vec3::Y)
+        // Calculate the camera's rotation angle based on time and speed
+        let camera_rotation_angle_horizontal = time_delta * camera_rotation_speed_horizontal;
+        let camera_rotation_angle_vertical = time_delta * camera_rotation_speed_vertical;
+        let camera_vertical = time_delta * camera_speed_vertical;
+        let camera_horizontal = time_delta * camera_speed_horizontal;
+        let camera_forward = time_delta * camera_speed_forward;
+
+        let side_movement = camera_transform.local_x();
+        let forward_movement = camera_transform.local_z();
+
+        camera_transform.rotate(Quat::from_rotation_z(camera_rotation_angle_horizontal) * Quat::from_axis_angle(side_movement, camera_rotation_angle_vertical));
+        camera_transform.translation.z += camera_vertical;
+        camera_transform.translation +=  (Vec3::new(forward_movement.x,forward_movement.y,0.) * -camera_forward) + (side_movement * camera_horizontal);
     }
     
 }
@@ -139,7 +181,7 @@ fn draw_spherical_colorspace(mut gizmos: Gizmos){
 
     let h_step = 24;
     let s_step = 240;
-    let v_step = 12;
+    let v_step = 24;
 
     let xyz_offset = (1.,0.,0.);
 
@@ -225,15 +267,15 @@ fn hsv_spherical_rgb(h: f32, s: f32, v: f32) -> (f32,f32,f32){
     }    
 }
 
-struct ToggleCameraRotation(bool);
-impl bevy::prelude::Resource for ToggleCameraRotation {}
+// struct ToggleCameraRotation(bool);
+// impl bevy::prelude::Resource for ToggleCameraRotation {}
 
-fn toggle_camera_rotation(
-    mut toggle_camera_rotation: ResMut<ToggleCameraRotation>,
-    keyboard_input: Res<Input<KeyCode>>,
-) {
-    // Toggle time-based rotation on/off when Space is pressed
-    if keyboard_input.just_pressed(KeyCode::Space) {
-        toggle_camera_rotation.0 = !toggle_camera_rotation.0;
-    }
-}
+// fn toggle_camera_rotation(
+//     mut toggle_camera_rotation: ResMut<ToggleCameraRotation>,
+//     keyboard_input: Res<Input<KeyCode>>,
+// ) {
+//     // Toggle time-based rotation on/off when Space is pressed
+//     if keyboard_input.just_pressed(KeyCode::Space) {
+//         toggle_camera_rotation.0 = !toggle_camera_rotation.0;
+//     }
+// }

@@ -2842,7 +2842,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "spherical_RGB"
+name = "spherical_rgb"
 version = "0.1.0"
 dependencies = [
  "bevy",
