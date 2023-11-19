@@ -2846,6 +2846,7 @@ name = "spherical_rgb"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "lazy_static",
 ]
 
 [[package]]

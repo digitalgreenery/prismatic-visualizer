@@ -1,11 +1,14 @@
 //! This example demonstrates the built-in 3d shapes in Bevy.
 //! The scene includes a patterned texture and a rotation for visualizing the normals and UVs.
 
-use std::f32::consts::PI;
+extern crate lazy_static;
+
+use std::{f32::consts::PI, sync::Mutex};
+use std::collections::HashMap;
 
 use bevy::{
     prelude::{*},
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat}, gizmos,
 };
 
 fn main() {
@@ -176,17 +179,20 @@ fn rotate(mut query: Query<&mut Transform, With<Shape>>,
 }
 
 fn draw_spherical_colorspace(mut gizmos: Gizmos){
+    //let color_map: HashMap<(f32,f32,f32),(f32,f32,f32)> = HashMap::new();
+
     let scale = 5.;
-    let mut prev_color = (0.,0.,0.);
 
     let h_step = 24;
     let s_step = 240;
     let v_step = 24;
 
     let xyz_offset = (1.,0.,0.);
+    let mut prev_color = hsv_spherical_rgb(0.0, 0.0, 0.0);
 
     for v in 0..v_step {
-        for s in 0..(s_step/(v_step-v)) {
+        let s_step_adjusted = s_step/(v_step-v);
+        for s in 0..s_step_adjusted {
             for h in  0..h_step{
                 let new_color= hsv_spherical_rgb(h as f32 / (h_step) as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
                 if !(s==0&&h==0) {
@@ -194,11 +200,11 @@ fn draw_spherical_colorspace(mut gizmos: Gizmos){
                   Vec3::new(prev_color.0*scale+xyz_offset.0,
                                   prev_color.1*scale+xyz_offset.1,
                                   prev_color.2*scale+xyz_offset.2
-                                            ),
+                                ),
                     Vec3::new(new_color.0*scale+xyz_offset.0,
                                   new_color.1*scale+xyz_offset.1,
                                   new_color.2*scale+xyz_offset.2
-                                    ), 
+                                ), 
                         Color::RgbaLinear { red: (prev_color.0), green: (prev_color.1), blue: (prev_color.2), alpha: (1.) });
                 }
                 
@@ -245,27 +251,70 @@ fn uv_debug_texture() -> Image {
     )
 }
 
-fn hsv_spherical_rgb(h: f32, s: f32, v: f32) -> (f32,f32,f32){
+// fn hsv_spherical_rgb(h: f32, s: f32, v: f32) -> (f32,f32,f32){
 
-    let hue_arc_length: f32 = 1.0/3.0;
-    let hue_part: f32 = (PI/2.0)*((3.0*h) % 1.0)*s+(PI/4.0)*(1.0-s);
-    let phi: f32 = 1.95968918625 - 1.1 * (1.15074-0.7893882996 * s).sin();
-    let a: f32 = v*hue_part.cos()*phi.sin();
-    let b: f32 = v*hue_part.sin()*phi.sin();
-    let c: f32 = v*phi.cos();
+//     let hue_arc_length: f32 = 1.0/3.0;
+//     let hue_part: f32 = (PI/2.0)*((3.0*h) % 1.0)*s+(PI/4.0)*(1.0-s);
+//     let phi: f32 = 1.95968918625 - 1.1 * (1.15074-0.7893882996 * s).sin();
+//     let a: f32 = v*hue_part.cos()*phi.sin();
+//     let b: f32 = v*hue_part.sin()*phi.sin();
+//     let c: f32 = v*phi.cos();
 
-    //println!("Hue_part:{hue_part}, :{h}");
+//     //println!("Hue_part:{hue_part}, :{h}");
 
-    if h < hue_arc_length {//yellow
-        (a,b,c)
+//     if h < hue_arc_length {//yellow
+//         (a,b,c)
+//     }
+//     else if h < 2.0 * hue_arc_length {//cyan
+//         (c,a,b)
+//     }
+//     else{//magenta
+//         (b,c,a)
+//     }    
+// }
+
+fn hsv_spherical_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
+    const PI: f32 = std::f32::consts::PI;
+
+    let key_hsv = (
+        (h * 100000000.0) as u32,
+        (s * 100000000.0) as u32,
+        (v * 100000000.0) as u32
+    );
+
+    // Define a static hash map for caching results
+    lazy_static::lazy_static! {
+        static ref CACHE: Mutex<HashMap<(u32, u32, u32), (f32, f32, f32)>> = Mutex::new(HashMap::new());
     }
-    else if h < 2.0 * hue_arc_length {//cyan
-        (c,a,b)
+
+    // Check if the result is already cached
+    if let Some(result) = CACHE.lock().unwrap().get(&key_hsv) {
+        return *result;
     }
-    else{//magenta
-        (b,c,a)
-    }    
+
+    let hue_arc_length: f32 = 1.0 / 3.0;
+    let hue_part: f32 = (PI / 2.0) * ((3.0 * h) % 1.0) * s + (PI / 4.0) * (1.0 - s);
+    let phi: f32 = 1.95968918625 - 1.1 * (1.15074 - 0.7893882996 * s).sin();
+    let a: f32 = v * hue_part.cos() * phi.sin();
+    let b: f32 = v * hue_part.sin() * phi.sin();
+    let c: f32 = v * phi.cos();
+
+    let result;
+
+    if h < hue_arc_length {
+        result = (a, b, c);
+    } else if h < 2.0 * hue_arc_length {
+        result = (c, a, b);
+    } else {
+        result = (b, c, a);
+    }
+
+    // Cache the result
+    CACHE.lock().unwrap().insert(key_hsv, result);
+
+    result
 }
+
 
 // struct ToggleCameraRotation(bool);
 // impl bevy::prelude::Resource for ToggleCameraRotation {}
