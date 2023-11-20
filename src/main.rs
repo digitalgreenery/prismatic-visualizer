@@ -6,16 +6,18 @@ extern crate lazy_static;
 use std::{f32::consts::PI, sync::Mutex};
 use std::collections::HashMap;
 
+
 use bevy::{
     prelude::{*},
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat}, gizmos,
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat, PrimitiveTopology},
+    render::mesh::Indices
 };
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_systems(Startup, (setup))
-        .add_systems(Update, (rotate, draw_spherical_colorspace))
+        .add_systems(Update, (rotate))
         .run();
 }
 
@@ -83,6 +85,22 @@ fn setup(
         transform: Transform::from_xyz(0., 6., 6.).looking_at(Vec3::new(0., 0., 6.), Vec3::Z),
         ..default()
     });
+
+    let spherical_rgb_meshes = draw_spherical_colorspace();
+    for(_index, mesh) in spherical_rgb_meshes.iter().enumerate() {
+        commands.spawn(PbrBundle {
+            mesh: meshes.add(mesh.clone()),
+            material: materials.add(StandardMaterial {
+                base_color: Color::WHITE,
+                unlit: true,
+                cull_mode: None,
+                emissive: Color::rgb_linear(1.0, 1.0, 1.0),// Set emissive color
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+    }
 
     // commands.insert_resource(ToggleCameraRotation(false));
  
@@ -178,40 +196,98 @@ fn rotate(mut query: Query<&mut Transform, With<Shape>>,
     
 }
 
-fn draw_spherical_colorspace(mut gizmos: Gizmos){
-    //let color_map: HashMap<(f32,f32,f32),(f32,f32,f32)> = HashMap::new();
+fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, c0: (f32,f32,f32), c1: (f32,f32,f32), c2: (f32,f32,f32), c3: (f32,f32,f32)) -> Mesh {
+    // Create a new mesh using a triangle list topology, where each set of 3 vertices composes a triangle.
+    Mesh::new(PrimitiveTopology::TriangleList)
+        // Add 4 vertices, each with its own position attribute (coordinate in
+        // 3D space), for each of the corners of the parallelogram.
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_POSITION,
+            vec![v0, v1, v2, v3]
+        )
+        // Assign color to each vertex based on its xyz values.
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_COLOR,
+            vec![
+                [c0.0, c0.1, c0.2, 0.5],
+                [c1.0, c1.1, c1.2, 0.5],
+                [c2.0, c2.1, c2.2, 0.5],
+                [c3.0, c3.1, c3.2, 0.5],
+            ]
+        )
+        // Assign normals (everything points outwards)
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_NORMAL,
+            vec![[1.0, 1.0, 1.0],
+                        [1.0, 1.0, 1.0],
+                        [1.0, 1.0, 1.0],
+                        [1.0, 1.0, 1.0]]
+        )
+        // After defining all the vertices and their attributes, build each triangle using the
+        // indices of the vertices that make it up in a counter-clockwise order.
+        .with_indices(Some(Indices::U32(vec![
+            // First triangle
+            0, 1, 2,
+            // Second triangle
+            1, 3, 2
+        ])))
+}
+
+fn draw_spherical_colorspace() -> Vec<Mesh>{
+    let mut colorspace_meshes  = Vec::<Mesh>::new();
 
     let scale = 5.;
 
     let h_step = 24;
-    let s_step = 240;
-    let v_step = 24;
+    let s_step = 6;
+    let v_step = 6;
 
-    let xyz_offset = (1.,0.,0.);
-    let mut prev_color = hsv_spherical_rgb(0.0, 0.0, 0.0);
+    let xyz_offset = (0.,0.,0.);
 
     for v in 0..v_step {
         let s_step_adjusted = s_step/(v_step-v);
         for s in 0..s_step_adjusted {
             for h in  0..h_step{
-                let new_color= hsv_spherical_rgb(h as f32 / (h_step) as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
-                if !(s==0&&h==0) {
-                    gizmos.line(
-                  Vec3::new(prev_color.0*scale+xyz_offset.0,
-                                  prev_color.1*scale+xyz_offset.1,
-                                  prev_color.2*scale+xyz_offset.2
-                                ),
-                    Vec3::new(new_color.0*scale+xyz_offset.0,
-                                  new_color.1*scale+xyz_offset.1,
-                                  new_color.2*scale+xyz_offset.2
-                                ), 
-                        Color::RgbaLinear { red: (prev_color.0), green: (prev_color.1), blue: (prev_color.2), alpha: (1.) });
-                }
-                
-                prev_color = new_color;
+                if !(h+1>=h_step||s+1>=s_step){}
+                let point0 = hsv_spherical_rgb(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32);
+                let point1 = hsv_spherical_rgb(((h+1) % h_step) as f32 / h_step as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
+                let point2 = hsv_spherical_rgb(h as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
+                let point3 = hsv_spherical_rgb(((h+1) % h_step) as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
+              
+              
+               colorspace_meshes.push(create_quad(
+                Vec3::new(point0.0*scale+xyz_offset.0,
+                point0.1*scale+xyz_offset.1,
+                point0.2*scale+xyz_offset.2
+                    ),
+                Vec3::new(point1.0*scale+xyz_offset.0,
+                    point1.1*scale+xyz_offset.1,
+                    point1.2*scale+xyz_offset.2
+                    ),
+                Vec3::new(point2.0*scale+xyz_offset.0,
+                    point2.1*scale+xyz_offset.1,
+                    point2.2*scale+xyz_offset.2
+                    ),
+                Vec3::new(point3.0*scale+xyz_offset.0,
+                    point3.1*scale+xyz_offset.1,
+                    point3.2*scale+xyz_offset.2
+                    ),
+                    point0,
+                    point1,
+                    point2,
+                    point3
+                ));
+               // gizmos.line(
+                    
+                    
+                    
+                //     Color::RgbaLinear { red: (point0.0), green: (point0.1), blue: (point0.2), alpha: (1.) }
+                // );
             }
         }
     }
+
+    return colorspace_meshes;
     
 }
 
