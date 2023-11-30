@@ -1,5 +1,6 @@
-//! This example demonstrates the built-in 3d shapes in Bevy.
-//! The scene includes a patterned texture and a rotation for visualizing the normals and UVs.
+//Digital Greenery
+//Spherical RGB Visualizer
+
 
 extern crate lazy_static; 
 
@@ -238,9 +239,9 @@ fn draw_spherical_colorspace() -> Vec<Mesh>{
 
     let scale = 5.;
 
-    let h_step = 24;
-    let s_step = 6;
-    let v_step = 6;
+    let h_step = 48;
+    let s_step = 12;
+    let v_step = 8;
 
     let xyz_offset = (0.,0.,0.);
 
