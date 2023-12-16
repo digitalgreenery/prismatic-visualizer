@@ -3220,12 +3220,20 @@ dependencies = [
 
 [[package]]
 name = "spherical_rgb"
-version = "0.1.1"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "num-traits",
+]
+
+[[package]]
+name = "spherical_rgb_visualizer"
+version = "0.1.2"
 dependencies = [
  "bevy",
  "bevy_egui",
  "egui 0.24.0",
- "lazy_static",
+ "spherical_rgb",
 ]
 
 [[package]]

@@ -2,10 +2,9 @@
 //Spherical RGB Visualizer
 
 
-extern crate lazy_static; 
-
-use std::{f32::consts::PI, sync::Mutex};
-use std::collections::HashMap;
+use spherical_rgb::{Color as SColor, DefinedColor, Gamma, spherical_hcl, tuple_lerp};
+use std::{f32::consts::PI};
+mod ui;
 
 
 use bevy::{
@@ -36,6 +35,11 @@ fn setup(
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+
+    let defined_color = DefinedColorResource(DefinedColor::new(SColor::new(1., 0., 0.), Gamma::new(1., 1., 1.)));
+
+    commands.insert_resource(defined_color);
+
     let debug_material = materials.add(StandardMaterial {
         base_color_texture: Some(images.add(uv_debug_texture())),
         ..default()
@@ -201,10 +205,15 @@ fn rotate(mut query: Query<&mut Transform, With<Shape>>,
     
 }
 
-fn ui_overlay(mut contexts: EguiContexts){
-    egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
+fn ui_overlay(mut contexts: EguiContexts, mut defined_color: ResMut<DefinedColorResource>){
+    let color = defined_color.0.color.to_tuple();
+    let (mut red, mut green, mut blue) = color;
+    egui::Window::new("Hello").show(contexts.ctx_mut(), |ui|{
         ui.label("world");
+        ui.add(egui::Slider::new( &mut red ,0.0..=1.0).text("Range"));
     });
+    defined_color.0 = DefinedColor::new(SColor::from_tuple((red,green,blue)),Gamma::new(1.,1.,1.));
+
 }
 
 fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3) -> Mesh {
@@ -224,6 +233,11 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3) -> Mesh {
                 [v0.x, v0.y, v0.z, 1.0],
                 [v0.x, v0.y, v0.z, 1.0],
                 [v0.x, v0.y, v0.z, 1.0],
+
+                // [v0.x, v0.y, v0.z, 1.0],
+                // [v1.x, v1.y, v1.z, 1.0],
+                // [v2.x, v2.y, v2.z, 1.0],
+                // [v3.x, v3.y, v3.z, 1.0],
             ]
         )
         // Assign normals (everything points outwards)
@@ -256,10 +270,10 @@ fn draw_spherical_colorspace() -> Vec<Mesh>{
         for s in 0..s_step_adjusted {
             for h in  0..h_step{ 
                 
-                let point0 = hsv_spherical_rgb(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32);
-                let point1 = hsv_spherical_rgb(((h+1) % h_step) as f32 / h_step as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
-                let point2 = hsv_spherical_rgb(h as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
-                let point3 = hsv_spherical_rgb(((h+1) % h_step) as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32);
+                let point0 = spherical_hcl(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32).to_tuple();
+                let point1 = spherical_hcl(((h+1) % h_step) as f32 / h_step as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple();
+                let point2 = spherical_hcl(h as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple();
+                let point3 = spherical_hcl(((h+1) % h_step) as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple();
                 
 
                 colorspace_meshes.push(create_quad(
@@ -284,7 +298,7 @@ fn uv_debug_texture() -> Image {
     let mut palette = [0; TEXTURE_SIZE*4];
 
     for n in 0..TEXTURE_SIZE{
-        let float_color = hsv_spherical_rgb((n)as f32/(TEXTURE_SIZE)as f32, 1.0, 1.0);
+        let float_color = spherical_hcl((n)as f32/(TEXTURE_SIZE)as f32, 1.0, 1.0).to_tuple();
         palette[n*4]    =(float_color.0*255.0)as u8;
         palette[n*4+1]  =(float_color.1*255.0)as u8;
         palette[n*4+2]  =(float_color.2*255.0)as u8;
@@ -312,47 +326,8 @@ fn uv_debug_texture() -> Image {
     )
 }
 
-fn hsv_spherical_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
-
-    let key_hsv = (
-        (h * 100000000.0) as u32,
-        (s * 100000000.0) as u32,
-        (v * 100000000.0) as u32
-    );
-
-    // Define a static hash map for caching results
-    lazy_static::lazy_static! {
-        static ref CACHE: Mutex<HashMap<(u32, u32, u32), (f32, f32, f32)>> = Mutex::new(HashMap::new());
-    }
-
-    // Check if the result is already cached
-    if let Some(result) = CACHE.lock().unwrap().get(&key_hsv) {
-        return *result;
-    }
-
-    let hue_arc_length: f32 = 1.0 / 3.0;
-    let hue_part: f32 = (PI / 2.0) * ((3.0 * h) % 1.0) * s + (PI / 4.0) * (1.0 - s);
-    let phi: f32 = 1.95968918625 - 1.1 * (1.15074 - 0.7893882996 * s).sin();
-    let a: f32 = v * hue_part.cos() * phi.sin();
-    let b: f32 = v * hue_part.sin() * phi.sin();
-    let c: f32 = v * phi.cos();
-
-    let result;
-
-    if h < hue_arc_length {
-        result = (a, b, c);
-    } else if h < 2.0 * hue_arc_length {
-        result = (c, a, b);
-    } else {
-        result = (b, c, a);
-    }
-
-    // Cache the result
-    CACHE.lock().unwrap().insert(key_hsv, result);
-
-    result
-}
-
+#[derive(Resource)]
+struct DefinedColorResource(spherical_rgb::DefinedColor);
 
 // struct ToggleCameraRotation(bool);
 // impl bevy::prelude::Resource for ToggleCameraRotation {}
