@@ -23,9 +23,20 @@ fn main() {
         .run();
 }
 
-/// A marker component for our shapes so we can query them separately from the ground plane
+/// A marker component for our components so we can query them separately from the ground plane
 #[derive(Component)]
 struct Shape;
+
+#[derive(Component)]
+struct SphericalVisualizationMeshes;
+
+#[derive(Resource)]
+struct DefinedColorResource{
+    component_limit: SColor,
+    gamma: Gamma,
+    hue_adjust: Gamma,
+    visualization_needs_updated: bool,
+}
 
 const X_EXTENT: f32 = 14.5;
 
@@ -36,7 +47,7 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
 
-    let defined_color = DefinedColorResource(DefinedColor::new(SColor::new(1., 0., 0.), Gamma::new(1., 1., 1.)));
+    let defined_color = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(1., 1., 1.), hue_adjust: Gamma::new(1., 1., 1.), visualization_needs_updated: false };
 
     commands.insert_resource(defined_color);
 
@@ -96,18 +107,21 @@ fn setup(
     let scale = 5.0;
     let spherical_rgb_meshes = draw_spherical_colorspace();
     for(_index, mesh) in spherical_rgb_meshes.iter().enumerate() {
-        commands.spawn(PbrBundle {
-            mesh: meshes.add(mesh.clone()),
-            material: materials.add(StandardMaterial {
-                base_color: Color::WHITE,
-                unlit: true,
-                cull_mode: None,
-                emissive: Color::rgb_linear(1.0, 1.0, 1.0),// Set emissive color
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(mesh.clone()),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::WHITE,
+                    unlit: true,
+                    cull_mode: None,
+                    emissive: Color::rgb(1.0, 1.0, 1.0),// Set emissive color
+                    ..Default::default()
+                }),
+                transform: Transform::from_scale(Vec3 { x: scale, y: scale, z: scale }),
                 ..Default::default()
-            }),
-            transform: Transform::from_scale(Vec3 { x: scale, y: scale, z: scale }),
-            ..Default::default()
-        });
+            },
+            SphericalVisualizationMeshes,
+        ));
 
     }
 
@@ -206,14 +220,45 @@ fn rotate(mut query: Query<&mut Transform, With<Shape>>,
 }
 
 fn ui_overlay(mut contexts: EguiContexts, mut defined_color: ResMut<DefinedColorResource>){
-    let color = defined_color.0.color.to_tuple();
-    let (mut red, mut green, mut blue) = color;
-    egui::Window::new("Hello").show(contexts.ctx_mut(), |ui|{
-        ui.label("world");
-        ui.add(egui::Slider::new( &mut red ,0.0..=1.0).text("Range"));
-    });
-    defined_color.0 = DefinedColor::new(SColor::from_tuple((red,green,blue)),Gamma::new(1.,1.,1.));
+    //Move current resource values to mutable variables for sliders
+    let (mut red, mut green, mut blue) = defined_color.component_limit.to_tuple();
+    let (mut red_gamma, mut green_gamma, mut blue_gamma) = defined_color.gamma.to_tuple();
+    let (mut yellow_adjust, mut cyan_adjust, mut magenta_adjust) = defined_color.hue_adjust.to_tuple();
 
+    //Create window for variable sliders
+    egui::Window::new("Spherical RGB Adjust").show(contexts.ctx_mut(), |ui|{
+        ui.label("Component Bounds");
+        ui.add(egui::Slider::new( &mut red ,0.0..=1.0).text("Red"));
+        ui.add(egui::Slider::new( &mut green ,0.0..=1.0).text("Green"));
+        ui.add(egui::Slider::new( &mut blue ,0.0..=1.0).text("Blue"));
+        ui.label("Gamma");
+        ui.add(egui::Slider::new( &mut red_gamma ,0.1..=3.0).text("Red"));
+        ui.add(egui::Slider::new( &mut green_gamma ,0.1..=3.0).text("Green"));
+        ui.add(egui::Slider::new( &mut blue_gamma ,0.1..=3.0).text("Blue"));
+        ui.label("Hue Adjust");
+        ui.add(egui::Slider::new( &mut yellow_adjust ,0.1..=3.0).text("Yellow"));
+        ui.add(egui::Slider::new( &mut cyan_adjust ,0.1..=3.0).text("Cyan"));
+        ui.add(egui::Slider::new( &mut magenta_adjust ,0.1..=3.0).text("Magenta"));
+
+    });
+
+    //Check if slider has been changed
+    let slider_changed = 
+        (red,green,blue) != defined_color.component_limit.to_tuple() ||
+        (red_gamma,green_gamma,blue_gamma) != defined_color.gamma.to_tuple() ||
+        (yellow_adjust,cyan_adjust,magenta_adjust) != defined_color.hue_adjust.to_tuple();
+
+    if slider_changed{
+        //Update values to Resource
+        defined_color.component_limit = SColor::from_tuple((red,green,blue));
+        defined_color.gamma = Gamma::new(red_gamma,green_gamma,blue_gamma);
+        defined_color.hue_adjust = Gamma::new(yellow_adjust,cyan_adjust,magenta_adjust);
+
+        //Update mesh
+        //todo
+        println!("Reached");
+
+    }
 }
 
 fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3) -> Mesh {
@@ -322,12 +367,10 @@ fn uv_debug_texture() -> Image {
         },
         TextureDimension::D2,
         &texture_data,
-        TextureFormat::Rgba8Unorm,
+        TextureFormat::Rgba8UnormSrgb,
     )
 }
 
-#[derive(Resource)]
-struct DefinedColorResource(spherical_rgb::DefinedColor);
 
 // struct ToggleCameraRotation(bool);
 // impl bevy::prelude::Resource for ToggleCameraRotation {}
