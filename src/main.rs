@@ -46,6 +46,7 @@ fn setup(
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let scale = 5.0;
 
     let defined_color = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(1., 1., 1.), hue_adjust: Gamma::new(1., 1., 1.), visualization_needs_updated: false };
 
@@ -100,11 +101,10 @@ fn setup(
         ..default()
     });
     commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0., 6., 6.).looking_at(Vec3::new(0., 0., 6.), Vec3::Z),
+        transform: Transform::from_xyz(scale*2., scale*2., scale*2.).looking_at(Vec3::new(0., 0., 0.), Vec3::Z),
         ..default()
     });
 
-    let scale = 5.0;
     let spherical_rgb_meshes = draw_spherical_colorspace();
     for(_index, mesh) in spherical_rgb_meshes.iter().enumerate() {
         commands.spawn((
