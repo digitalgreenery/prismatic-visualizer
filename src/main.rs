@@ -101,8 +101,8 @@ fn setup(
         ..default()
     });
 
-    let defined_color = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(1., 1., 1.), hue_adjust: Gamma::new(1., 1., 1.), visualization_needs_updated: false };
-    let defined_color_copy = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(1., 1., 1.), hue_adjust: Gamma::new(1., 1., 1.), visualization_needs_updated: false };
+    let defined_color = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(2.2, 1.2, 1.75), hue_adjust: Gamma::new(1., 1., 1.), visualization_needs_updated: false };
+    let defined_color_copy = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(2.2, 1.2, 1.75), hue_adjust: Gamma::new(1., 1., 1.), visualization_needs_updated: false };
 
     commands.insert_resource(defined_color);
 
@@ -303,7 +303,8 @@ fn spawn_spherical_visualization(
 
 fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, defined_color: DefinedColorResource) -> Mesh {
     
-    let gamma = defined_color.gamma.clone();
+    let (r_gamma,g_gamma,b_gamma) = defined_color.gamma.to_tuple();
+    let gamma = Gamma::new(r_gamma/2.2,g_gamma/2.2,b_gamma/2.2);
     let (c0,c1,c2,c3) = (
         DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
         DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
@@ -350,7 +351,7 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, defined_color: DefinedCol
 fn draw_spherical_colorspace(defined_color: DefinedColorResource) -> Vec<Mesh>{
     let mut colorspace_meshes  = Vec::<Mesh>::new();
 
-    let (h_step,s_step,v_step) = (48, 12, 8);
+    let (h_step,s_step,v_step) = (24, 12, 8);
 
     for v in 0..v_step {
         let s_step_adjusted = s_step/(v_step-v);
