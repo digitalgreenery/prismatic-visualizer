@@ -263,11 +263,7 @@ fn update_visualization(
             commands.entity(mesh).despawn();
         }
     
-    let defined_color_copy = DefinedColorResource{ 
-        component_limit: SColor::from_tuple(defined_color.component_limit.to_tuple()), 
-        gamma: Gamma::from_tuple(defined_color.gamma.to_tuple()), 
-        hue_adjust: Gamma::from_tuple(defined_color.hue_adjust.to_tuple()), 
-        visualization_needs_updated: false };
+    let defined_color_copy = defined_color.clone();
 
         spawn_spherical_visualization(commands, meshes, materials, defined_color_copy);
     }
@@ -303,7 +299,16 @@ fn spawn_spherical_visualization(
 }
 
 
-fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3) -> Mesh {
+fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, defined_color: DefinedColorResource) -> Mesh {
+    
+    let gamma = defined_color.gamma.clone();
+    let (c0,c1,c2,c3) = (
+        DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
+        DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
+        DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
+        DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
+    );
+
     // Create a new mesh using a triangle list topology, where each set of 3 vertices composes a triangle.
     Mesh::new(PrimitiveTopology::TriangleList)
         // Add 4 vertices, each with its own position attribute (coordinate in
@@ -316,15 +321,10 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3) -> Mesh {
         .with_inserted_attribute(
             Mesh::ATTRIBUTE_COLOR,
             vec![
-                [v0.x, v0.y, v0.z, 1.0],
-                [v0.x, v0.y, v0.z, 1.0],
-                [v0.x, v0.y, v0.z, 1.0],
-                [v0.x, v0.y, v0.z, 1.0],
-
-                // [v0.x, v0.y, v0.z, 1.0],
-                // [v1.x, v1.y, v1.z, 1.0],
-                // [v2.x, v2.y, v2.z, 1.0],
-                // [v3.x, v3.y, v3.z, 1.0],
+                [c0.r, c0.g, c0.b, 1.0],
+                [c0.r, c0.g, c0.b, 1.0],
+                [c0.r, c0.g, c0.b, 1.0],
+                [c0.r, c0.g, c0.b, 1.0],
             ]
         )
         // Assign normals (everything points outwards)
@@ -348,8 +348,6 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3) -> Mesh {
 fn draw_spherical_colorspace(defined_color: DefinedColorResource) -> Vec<Mesh>{
     let mut colorspace_meshes  = Vec::<Mesh>::new();
 
-    let gamma = defined_color.gamma.clone();
-
     let (h_step,s_step,v_step) = (24, 8, 8);
 
     for v in 0..v_step {
@@ -358,10 +356,11 @@ fn draw_spherical_colorspace(defined_color: DefinedColorResource) -> Vec<Mesh>{
             for h in  0..h_step{   
 
                 colorspace_meshes.push(create_quad(
-                    Vec3::from(DefinedColor::new(spherical_hcl(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32), gamma).to_color().to_tuple()),
-                    Vec3::from(DefinedColor::new(spherical_hcl(((h+1) % h_step) as f32 / h_step as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32), gamma).to_color().to_tuple()),
-                    Vec3::from(DefinedColor::new(spherical_hcl(h as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32), gamma).to_color().to_tuple()),
-                    Vec3::from(DefinedColor::new(spherical_hcl(((h+1) % h_step) as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32), gamma).to_color().to_tuple()),
+                    Vec3::from(spherical_hcl(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32).to_tuple()),
+                    Vec3::from(spherical_hcl(((h+1) % h_step) as f32 / h_step as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
+                    Vec3::from(spherical_hcl(h as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
+                    Vec3::from(spherical_hcl(((h+1) % h_step) as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
+                    defined_color.clone(),
                 ));
 
             }
@@ -379,7 +378,7 @@ fn uv_debug_texture() -> Image {
     let mut palette = [0; TEXTURE_SIZE*4];
 
     for n in 0..TEXTURE_SIZE{
-        let float_color = spherical_hcl((n)as f32/(TEXTURE_SIZE)as f32, 1.0, 1.0).to_tuple();
+        let float_color = DefinedColor::new(spherical_hcl((n)as f32/(TEXTURE_SIZE)as f32, 1.0, 1.0),Gamma::new(2.2,2.2,2.2,)).to_color().to_tuple();
         palette[n*4]    =(float_color.0*255.0)as u8;
         palette[n*4+1]  =(float_color.1*255.0)as u8;
         palette[n*4+2]  =(float_color.2*255.0)as u8;
