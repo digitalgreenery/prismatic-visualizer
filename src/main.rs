@@ -276,19 +276,21 @@ fn spawn_spherical_visualization(
     defined_color: DefinedColorResource)
 {
 
+    let (x_scale, y_scale, z_scale) = defined_color.component_limit.to_tuple();
+
     let spherical_rgb_meshes = draw_spherical_colorspace(defined_color);
     for(_index, mesh) in spherical_rgb_meshes.iter().enumerate() {
         commands.spawn((
             PbrBundle {
                 mesh: meshes.add(mesh.clone()),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::WHITE,
+                    base_color: Color::rgb(1.,1.,1.),
                     unlit: true,
                     cull_mode: None,
                     emissive: Color::rgb(1.0, 1.0, 1.0),// Set emissive color
                     ..Default::default()
                 }),
-                transform: Transform::from_scale(Vec3 { x: SCALE, y: SCALE, z: SCALE }),
+                transform: Transform::from_scale(Vec3 { x: SCALE*x_scale, y: SCALE*y_scale, z: SCALE*z_scale }),
                 ..Default::default()
             },
             SphericalVisualizationMeshes,
@@ -348,18 +350,33 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, defined_color: DefinedCol
 fn draw_spherical_colorspace(defined_color: DefinedColorResource) -> Vec<Mesh>{
     let mut colorspace_meshes  = Vec::<Mesh>::new();
 
-    let (h_step,s_step,v_step) = (24, 8, 8);
+    let (h_step,s_step,v_step) = (48, 12, 8);
 
     for v in 0..v_step {
         let s_step_adjusted = s_step/(v_step-v);
         for s in 0..s_step_adjusted {
             for h in  0..h_step{   
 
-                colorspace_meshes.push(create_quad(
+                // let (red, green, blue) = spherical_hcl(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32).to_tuple();
+
+                // if  red > defined_color.component_limit.r ||
+                //     green > defined_color.component_limit.g ||
+                //     blue > defined_color.component_limit.b  {
+                //     break;
+                // }
+                
+                let (v0,v1,v2,v3)= (
                     Vec3::from(spherical_hcl(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32).to_tuple()),
                     Vec3::from(spherical_hcl(((h+1) % h_step) as f32 / h_step as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
                     Vec3::from(spherical_hcl(h as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
                     Vec3::from(spherical_hcl(((h+1) % h_step) as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
+                );
+
+                colorspace_meshes.push(create_quad(
+                    v0,
+                    v1,
+                    v2,
+                    v3,
                     defined_color.clone(),
                 ));
 
