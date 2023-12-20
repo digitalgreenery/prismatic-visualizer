@@ -2,7 +2,7 @@
 //Spherical RGB Visualizer
 
 
-use spherical_rgb::{Color as SColor, DefinedColor, Gamma, spherical_hcl, cubic_hsv, tuple_lerp};
+use spherical_rgb::{Color as SColor, DefinedColor, Gamma, spherical_hcl, cubic_hsv};
 use std::{f32::consts::PI};
 mod ui;
 
@@ -37,6 +37,9 @@ struct VisualizationSettings{
     hcl_adjust: (u8,u8,u8),
     visualization_needs_updated: bool,
     visualization_shape: VisualiztionShape,
+    gamma_deform: bool,
+    discrete_color: bool,
+    invert_visualization: bool,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -113,7 +116,10 @@ fn setup(
         gamma: Gamma::new(2., 1.3, 1.9), 
         hcl_adjust: (24,8,8), 
         visualization_needs_updated: false, 
-        visualization_shape: VisualiztionShape::Spherical
+        visualization_shape: VisualiztionShape::Spherical,
+        gamma_deform: false,
+        discrete_color: true,
+        invert_visualization: false,
     };
 
     let settings_copy = settings.clone();
@@ -121,11 +127,7 @@ fn setup(
     commands.insert_resource(settings);
 
     spawn_spherical_visualization(commands, meshes, materials, settings_copy);
-    
-    
-    
 
-    // commands.insert_resource(ToggleCameraRotation(false));
  
 }
 
@@ -233,6 +235,9 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
     let (mut red_gamma, mut green_gamma, mut blue_gamma) = settings.gamma.to_tuple();
     let (mut hue_adjust, mut chroma_adjust, mut luminance_adjust) = settings.hcl_adjust;
     let mut v_shape = settings.visualization_shape.clone();
+    let mut discrete_color = settings.discrete_color.clone();
+    let mut gamma_deform = settings.gamma_deform.clone();
+    let mut invert_vis = settings.invert_visualization.clone();
 
     //Create window for variable sliders
     egui::Window::new("Spherical RGB Adjust").show(contexts.ctx_mut(), |ui|{
@@ -253,8 +258,12 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
         ui.horizontal(|ui| {
             ui.radio_value(&mut v_shape, VisualiztionShape::Spherical, "Sphere");
             ui.radio_value(&mut v_shape, VisualiztionShape::Cubic, "Cube");
-        })
-
+        });
+        ui.separator();
+        ui.label("Additional Settings");
+        ui.checkbox(&mut discrete_color, "Discrete Color");
+        ui.checkbox(&mut gamma_deform, "Gamma Deform");
+        ui.checkbox(&mut invert_vis, "Invert Visualization");
     });
 
     //Check if slider has been changed
@@ -262,19 +271,21 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
         (red,green,blue) != settings.component_limit.to_tuple() ||
         (red_gamma,green_gamma,blue_gamma) != settings.gamma.to_tuple() ||
         (hue_adjust,chroma_adjust,luminance_adjust) != settings.hcl_adjust ||
-        (v_shape != settings.visualization_shape);
+        (v_shape != settings.visualization_shape)||
+        (discrete_color != settings.discrete_color)||
+        (gamma_deform != settings.gamma_deform)||
+        (invert_vis != settings.invert_visualization);
 
     if slider_changed{
         //Update values to Resource
+        settings.visualization_needs_updated = true;
         settings.component_limit = SColor::from_tuple((red,green,blue));
         settings.gamma = Gamma::new(red_gamma,green_gamma,blue_gamma);
         settings.hcl_adjust = (hue_adjust,chroma_adjust,luminance_adjust);
         settings.visualization_shape = v_shape;
-
-        //Update mesh
-        //todo
-        println!("Reached");
-        settings.visualization_needs_updated = true;
+        settings.discrete_color = discrete_color;
+        settings.gamma_deform = gamma_deform;
+        settings.invert_visualization = invert_vis;
 
     }
 }
@@ -334,8 +345,10 @@ fn spawn_spherical_visualization(
 
 fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, settings: VisualizationSettings) -> Mesh {
     
-    let (r_gamma,g_gamma,b_gamma) = settings.gamma.to_tuple();
-    let gamma = Gamma::new(r_gamma/2.2,g_gamma/2.2,b_gamma/2.2);
+
+    let (r_gamma,g_gamma,b_gamma) = if settings.gamma_deform {(1.,1.,1.)} else {settings.gamma.to_tuple()};
+    let gamma_adjust = 2.2;
+    let gamma = Gamma::new(r_gamma/gamma_adjust,g_gamma/gamma_adjust,b_gamma/gamma_adjust);
     let (c0,c1,c2,c3) = (
         DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
         DefinedColor::new(SColor::new(v1.x,v1.y,v1.z),gamma).to_color(),
@@ -354,12 +367,23 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, settings: VisualizationSe
         // Assign color to each vertex based on its xyz values.
         .with_inserted_attribute(
             Mesh::ATTRIBUTE_COLOR,
-            vec![
-                [c0.r, c0.g, c0.b, 1.0],
-                [c0.r, c0.g, c0.b, 1.0],
-                [c0.r, c0.g, c0.b, 1.0],
-                [c0.r, c0.g, c0.b, 1.0],
-            ]
+            
+            if settings.discrete_color {
+                vec![
+                    [c0.r, c0.g, c0.b, 1.0],
+                    [c0.r, c0.g, c0.b, 1.0],
+                    [c0.r, c0.g, c0.b, 1.0],
+                    [c0.r, c0.g, c0.b, 1.0],
+                ]
+            }
+            else {
+                vec![
+                    [c0.r, c0.g, c0.b, 1.0],
+                    [c1.r, c1.g, c1.b, 1.0],
+                    [c2.r, c2.g, c2.b, 1.0],
+                    [c3.r, c3.g, c3.b, 1.0],
+                ]
+            }
         )
         // Assign normals (everything points outwards)
         .with_inserted_attribute(
@@ -398,26 +422,28 @@ fn draw_spherical_colorspace(settings: VisualizationSettings) -> Vec<Mesh>{
                 // }
 
                 let (hue,hue_next) = (h as f32 / h_step as f32, ((h+1) % h_step) as f32 / h_step as f32);
-                let (chroma, chroma_next) = (1.-(s as f32 /(s_step/(v_step-v)) as f32), 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32));
-                let luminance = v as f32 / v_step as f32;
-                
+                let (chroma,mut  chroma_next) = (1.-(s as f32 /(s_step/(v_step-v)) as f32), 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32));
+                let (luminance,mut  luminance_next) = (v as f32 / v_step as f32, (v + 1) as f32 / v_step as f32);
+
+                if settings.invert_visualization {
+                    chroma_next = chroma;
+                }
+                else {
+                    luminance_next = luminance;
+                }
+
                 let (v0, v1, v2, v3);
+
+                let spherical_fn: fn (f32, f32, f32) -> SColor = spherical_hcl;
+                let cubic_fn: fn (f32, f32, f32) -> SColor = cubic_hsv;
+
+                let gamma_transform = if settings.gamma_deform {settings.gamma.clone()} else { Gamma::new(1.,1.,1.).clone() };
 
                 match settings.visualization_shape {
                     VisualiztionShape::Spherical =>
-                        (v0,v1,v2,v3)= (
-                            Vec3::from(spherical_hcl(hue,chroma, luminance).to_tuple()),
-                            Vec3::from(spherical_hcl(hue_next, chroma, luminance).to_tuple()),
-                            Vec3::from(spherical_hcl(hue, chroma_next, luminance).to_tuple()),
-                            Vec3::from(spherical_hcl(hue_next, chroma_next, luminance).to_tuple()),
-                        ),
+                        (v0,v1,v2,v3)= get_four_points(spherical_fn, gamma_transform, hue, hue_next, chroma, chroma_next, luminance, luminance_next),
                     VisualiztionShape::Cubic =>
-                        (v0,v1,v2,v3)= (
-                            Vec3::from(cubic_hsv(hue,chroma, luminance).to_tuple()),
-                            Vec3::from(cubic_hsv(hue_next, chroma, luminance).to_tuple()),
-                            Vec3::from(cubic_hsv(hue, chroma_next, luminance).to_tuple()),
-                            Vec3::from(cubic_hsv(hue_next, chroma_next, luminance).to_tuple()),
-                        ),
+                        (v0,v1,v2,v3)= get_four_points(cubic_fn, gamma_transform, hue, hue_next, chroma, chroma_next, luminance, luminance_next),
                 }
 
                 colorspace_meshes.push(create_quad(
@@ -434,6 +460,17 @@ fn draw_spherical_colorspace(settings: VisualizationSettings) -> Vec<Mesh>{
 
     return colorspace_meshes;
     
+}
+
+
+
+fn get_four_points(f: fn(f32,f32,f32)-> SColor, gamma: Gamma, hue: f32, hue_next: f32, chroma: f32, chroma_next: f32, luminance: f32, luminance_next: f32)-> (Vec3,Vec3,Vec3,Vec3){
+    (
+        Vec3::from(gamma.apply_gamma(&f(hue,chroma, luminance)).to_tuple()),
+        Vec3::from(gamma.apply_gamma(&f(hue_next, chroma, luminance)).to_tuple()),
+        Vec3::from(gamma.apply_gamma(&f(hue, chroma_next, luminance_next)).to_tuple()),
+        Vec3::from(gamma.apply_gamma(&f(hue_next, chroma_next, luminance_next)).to_tuple()),
+    )
 }
 
 /// Creates a colorful test pattern
