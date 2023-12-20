@@ -110,7 +110,7 @@ fn setup(
 
     let settings = VisualizationSettings{ 
         component_limit: SColor::new(1., 1., 1.), 
-        gamma: Gamma::new(2.2, 1.2, 1.75), 
+        gamma: Gamma::new(2., 1.3, 1.9), 
         hcl_adjust: (24,8,8), 
         visualization_needs_updated: false, 
         visualization_shape: VisualiztionShape::Spherical
