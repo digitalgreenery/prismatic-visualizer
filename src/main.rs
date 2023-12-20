@@ -2,7 +2,7 @@
 //Spherical RGB Visualizer
 
 
-use spherical_rgb::{Color as SColor, DefinedColor, Gamma, spherical_hcl, tuple_lerp};
+use spherical_rgb::{Color as SColor, DefinedColor, Gamma, spherical_hcl, cubic_hsv, tuple_lerp};
 use std::{f32::consts::PI};
 mod ui;
 
@@ -31,11 +31,18 @@ struct Shape;
 struct SphericalVisualizationMeshes;
 
 #[derive(Resource, Clone)]
-struct DefinedColorResource{
+struct VisualizationSettings{
     component_limit: SColor,
     gamma: Gamma,
     hcl_adjust: (u8,u8,u8),
     visualization_needs_updated: bool,
+    visualization_shape: VisualiztionShape,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+enum VisualiztionShape{
+    Spherical,
+    Cubic,
 }
 
 const X_EXTENT: f32 = 14.5;
@@ -101,12 +108,19 @@ fn setup(
         ..default()
     });
 
-    let defined_color = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(2.2, 1.2, 1.75), hcl_adjust: (24,8,8), visualization_needs_updated: false };
-    let defined_color_copy = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(2.2, 1.2, 1.75), hcl_adjust: (24,8,8), visualization_needs_updated: false };
+    let settings = VisualizationSettings{ 
+        component_limit: SColor::new(1., 1., 1.), 
+        gamma: Gamma::new(2.2, 1.2, 1.75), 
+        hcl_adjust: (24,8,8), 
+        visualization_needs_updated: false, 
+        visualization_shape: VisualiztionShape::Spherical
+    };
 
-    commands.insert_resource(defined_color);
+    let settings_copy = settings.clone();
 
-    spawn_spherical_visualization(commands, meshes, materials, defined_color_copy);
+    commands.insert_resource(settings);
+
+    spawn_spherical_visualization(commands, meshes, materials, settings_copy);
     
     
     
@@ -213,11 +227,12 @@ fn camera_controls(
 
 }
 
-fn ui_overlay(mut contexts: EguiContexts, mut defined_color: ResMut<DefinedColorResource>){
+fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSettings>){
     //Move current resource values to mutable variables for sliders
-    let (mut red, mut green, mut blue) = defined_color.component_limit.to_tuple();
-    let (mut red_gamma, mut green_gamma, mut blue_gamma) = defined_color.gamma.to_tuple();
-    let (mut hue_adjust, mut chroma_adjust, mut luminance_adjust) = defined_color.hcl_adjust;
+    let (mut red, mut green, mut blue) = settings.component_limit.to_tuple();
+    let (mut red_gamma, mut green_gamma, mut blue_gamma) = settings.gamma.to_tuple();
+    let (mut hue_adjust, mut chroma_adjust, mut luminance_adjust) = settings.hcl_adjust;
+    let mut v_shape = settings.visualization_shape.clone();
 
     //Create window for variable sliders
     egui::Window::new("Spherical RGB Adjust").show(contexts.ctx_mut(), |ui|{
@@ -230,35 +245,43 @@ fn ui_overlay(mut contexts: EguiContexts, mut defined_color: ResMut<DefinedColor
         ui.add(egui::Slider::new( &mut green_gamma ,0.1..=3.0).text("Green"));
         ui.add(egui::Slider::new( &mut blue_gamma ,0.1..=3.0).text("Blue"));
         ui.label("HCL Adjust");
-        ui.add(egui::Slider::new( &mut hue_adjust ,1..=48).text("Hue"));
+        ui.add(egui::Slider::new( &mut hue_adjust ,3..=48).text("Hue"));
         ui.add(egui::Slider::new( &mut chroma_adjust ,1..=24).text("Chroma"));
         ui.add(egui::Slider::new( &mut luminance_adjust ,1..=16).text("Luminance"));
+        ui.separator();
+        ui.label("Shape");
+        ui.horizontal(|ui| {
+            ui.radio_value(&mut v_shape, VisualiztionShape::Spherical, "Sphere");
+            ui.radio_value(&mut v_shape, VisualiztionShape::Cubic, "Cube");
+        })
 
     });
 
     //Check if slider has been changed
     let slider_changed = 
-        (red,green,blue) != defined_color.component_limit.to_tuple() ||
-        (red_gamma,green_gamma,blue_gamma) != defined_color.gamma.to_tuple() ||
-        (hue_adjust,chroma_adjust,luminance_adjust) != defined_color.hcl_adjust;
+        (red,green,blue) != settings.component_limit.to_tuple() ||
+        (red_gamma,green_gamma,blue_gamma) != settings.gamma.to_tuple() ||
+        (hue_adjust,chroma_adjust,luminance_adjust) != settings.hcl_adjust ||
+        (v_shape != settings.visualization_shape);
 
     if slider_changed{
         //Update values to Resource
-        defined_color.component_limit = SColor::from_tuple((red,green,blue));
-        defined_color.gamma = Gamma::new(red_gamma,green_gamma,blue_gamma);
-        defined_color.hcl_adjust = (hue_adjust,chroma_adjust,luminance_adjust);
+        settings.component_limit = SColor::from_tuple((red,green,blue));
+        settings.gamma = Gamma::new(red_gamma,green_gamma,blue_gamma);
+        settings.hcl_adjust = (hue_adjust,chroma_adjust,luminance_adjust);
+        settings.visualization_shape = v_shape;
 
         //Update mesh
         //todo
         println!("Reached");
-        defined_color.visualization_needs_updated = true;
+        settings.visualization_needs_updated = true;
 
     }
 }
 
 fn update_visualization(
     mut commands: Commands,
-    mut defined_color: ResMut<DefinedColorResource>,
+    mut defined_color: ResMut<VisualizationSettings>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
     entities: Query<Entity, With<SphericalVisualizationMeshes>>)
@@ -281,7 +304,7 @@ fn spawn_spherical_visualization(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    defined_color: DefinedColorResource)
+    defined_color: VisualizationSettings)
 {
 
     let (x_scale, y_scale, z_scale) = defined_color.component_limit.to_tuple();
@@ -309,15 +332,15 @@ fn spawn_spherical_visualization(
 }
 
 
-fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, defined_color: DefinedColorResource) -> Mesh {
+fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, settings: VisualizationSettings) -> Mesh {
     
-    let (r_gamma,g_gamma,b_gamma) = defined_color.gamma.to_tuple();
+    let (r_gamma,g_gamma,b_gamma) = settings.gamma.to_tuple();
     let gamma = Gamma::new(r_gamma/2.2,g_gamma/2.2,b_gamma/2.2);
     let (c0,c1,c2,c3) = (
         DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
-        DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
-        DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
-        DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
+        DefinedColor::new(SColor::new(v1.x,v1.y,v1.z),gamma).to_color(),
+        DefinedColor::new(SColor::new(v2.x,v2.y,v2.z),gamma).to_color(),
+        DefinedColor::new(SColor::new(v3.x,v3.y,v3.z),gamma).to_color(),
     );
 
     // Create a new mesh using a triangle list topology, where each set of 3 vertices composes a triangle.
@@ -356,10 +379,10 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, defined_color: DefinedCol
         ])))
 }
 
-fn draw_spherical_colorspace(defined_color: DefinedColorResource) -> Vec<Mesh>{
+fn draw_spherical_colorspace(settings: VisualizationSettings) -> Vec<Mesh>{
     let mut colorspace_meshes  = Vec::<Mesh>::new();
 
-    let (h_step,s_step,v_step) = defined_color.hcl_adjust;
+    let (h_step,s_step,v_step) = settings.hcl_adjust;
 
     for v in 0..v_step {
         let s_step_adjusted = s_step/(v_step-v);
@@ -373,20 +396,36 @@ fn draw_spherical_colorspace(defined_color: DefinedColorResource) -> Vec<Mesh>{
                 //     blue > defined_color.component_limit.b  {
                 //     break;
                 // }
+
+                let (hue,hue_next) = (h as f32 / h_step as f32, ((h+1) % h_step) as f32 / h_step as f32);
+                let (chroma, chroma_next) = (1.-(s as f32 /(s_step/(v_step-v)) as f32), 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32));
+                let luminance = v as f32 / v_step as f32;
                 
-                let (v0,v1,v2,v3)= (
-                    Vec3::from(spherical_hcl(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32).to_tuple()),
-                    Vec3::from(spherical_hcl(((h+1) % h_step) as f32 / h_step as f32, 1.-(s as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
-                    Vec3::from(spherical_hcl(h as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
-                    Vec3::from(spherical_hcl(((h+1) % h_step) as f32 / (h_step) as f32, 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32), v as f32 /v_step as f32).to_tuple()),
-                );
+                let (v0, v1, v2, v3);
+
+                match settings.visualization_shape {
+                    VisualiztionShape::Spherical =>
+                        (v0,v1,v2,v3)= (
+                            Vec3::from(spherical_hcl(hue,chroma, luminance).to_tuple()),
+                            Vec3::from(spherical_hcl(hue_next, chroma, luminance).to_tuple()),
+                            Vec3::from(spherical_hcl(hue, chroma_next, luminance).to_tuple()),
+                            Vec3::from(spherical_hcl(hue_next, chroma_next, luminance).to_tuple()),
+                        ),
+                    VisualiztionShape::Cubic =>
+                        (v0,v1,v2,v3)= (
+                            Vec3::from(cubic_hsv(hue,chroma, luminance).to_tuple()),
+                            Vec3::from(cubic_hsv(hue_next, chroma, luminance).to_tuple()),
+                            Vec3::from(cubic_hsv(hue, chroma_next, luminance).to_tuple()),
+                            Vec3::from(cubic_hsv(hue_next, chroma_next, luminance).to_tuple()),
+                        ),
+                }
 
                 colorspace_meshes.push(create_quad(
                     v0,
                     v1,
                     v2,
                     v3,
-                    defined_color.clone(),
+                    settings.clone(),
                 ));
 
             }
