@@ -18,8 +18,8 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(EguiPlugin)
-        .add_systems(Startup, (setup))
-        .add_systems(Update, (rotate,ui_overlay,update_visualization))
+        .add_systems(Startup, setup)
+        .add_systems(Update, (rotate,camera_controls,ui_overlay,update_visualization))
         .run();
 }
 
@@ -34,7 +34,7 @@ struct SphericalVisualizationMeshes;
 struct DefinedColorResource{
     component_limit: SColor,
     gamma: Gamma,
-    hue_adjust: Gamma,
+    hcl_adjust: (u8,u8,u8),
     visualization_needs_updated: bool,
 }
 
@@ -89,20 +89,20 @@ fn setup(
         ..default()
     });
 
-    // ground plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Plane::from_size(100.0).into()),
-        material: materials.add(Color::SILVER.into()),
-        transform: Transform::from_xyz(0.,0.,-0.1).with_rotation( Quat::from_rotation_x(PI/2.)),
-        ..default()
-    });
+    // // ground plane
+    // commands.spawn(PbrBundle {
+    //     mesh: meshes.add(shape::Plane::from_size(100.0).into()),
+    //     material: materials.add(Color::SILVER.into()),
+    //     transform: Transform::from_xyz(0.,0.,-0.1).with_rotation( Quat::from_rotation_x(PI/2.)),
+    //     ..default()
+    // });
     commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(SCALE*2., SCALE*2., SCALE*2.).looking_at(Vec3::new(0., 0., 0.), Vec3::Z),
         ..default()
     });
 
-    let defined_color = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(2.2, 1.2, 1.75), hue_adjust: Gamma::new(1., 1., 1.), visualization_needs_updated: false };
-    let defined_color_copy = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(2.2, 1.2, 1.75), hue_adjust: Gamma::new(1., 1., 1.), visualization_needs_updated: false };
+    let defined_color = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(2.2, 1.2, 1.75), hcl_adjust: (24,8,8), visualization_needs_updated: false };
+    let defined_color_copy = DefinedColorResource{ component_limit: SColor::new(1., 1., 1.), gamma: Gamma::new(2.2, 1.2, 1.75), hcl_adjust: (24,8,8), visualization_needs_updated: false };
 
     commands.insert_resource(defined_color);
 
@@ -115,101 +115,109 @@ fn setup(
  
 }
 
-fn rotate(mut query: Query<&mut Transform, With<Shape>>, 
-    mut camera_query: Query<&mut Transform, (With<Camera>, Without<Shape>)>, 
-    // camera_rotation: Res<ToggleCameraRotation>,
-    keyboard: Res<Input<KeyCode>>, 
+fn rotate(mut query: Query<&mut Transform, With<Shape>>,
     time: Res<Time>) {
     
     for mut transform in &mut query {
         transform.rotate_y(time.delta_seconds() / 2.);
     }
-
-    for mut camera_transform in &mut camera_query {
-
-        let boost = if keyboard.pressed(KeyCode::ShiftLeft) {2.} else {0.};
-        let speed = 2. + boost;
-
-        // Define the camera's rotation speed in radians per second
-        let camera_rotation_speed_horizontal = 
-            if keyboard.pressed(KeyCode::Q)||keyboard.pressed(KeyCode::Left){
-                speed
-            }
-            else if keyboard.pressed(KeyCode::E)||keyboard.pressed(KeyCode::Right) {
-                -speed
-            }
-            else {
-                0.0
-        };
-
-        let camera_rotation_speed_vertical = 
-            if keyboard.pressed(KeyCode::R)||keyboard.pressed(KeyCode::Up){
-                speed
-            }
-            else if keyboard.pressed(KeyCode::F)||keyboard.pressed(KeyCode::Down) {
-                -speed
-            }
-            else {
-                0.0
-        };
-
-        let camera_speed_horizontal = 
-            if keyboard.pressed(KeyCode::D){
-                speed
-            }
-            else if keyboard.pressed(KeyCode::A) {
-                -speed
-            }
-            else {
-                0.0
-        };
-
-        let camera_speed_forward = 
-            if keyboard.pressed(KeyCode::W){
-                speed
-            }
-            else if keyboard.pressed(KeyCode::S) {
-                -speed
-            }
-            else {
-                0.0
-        };
-
-        let camera_speed_vertical =
-        if keyboard.pressed(KeyCode::Space){
-            speed
-        }
-        else if keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::C) {
-            -speed
-        }
-        else {
-            0.0
-        };
-
-        let time_delta = time.delta_seconds();
-
-        // Calculate the camera's rotation angle based on time and speed
-        let camera_rotation_angle_horizontal = time_delta * camera_rotation_speed_horizontal;
-        let camera_rotation_angle_vertical = time_delta * camera_rotation_speed_vertical;
-        let camera_vertical = time_delta * camera_speed_vertical;
-        let camera_horizontal = time_delta * camera_speed_horizontal;
-        let camera_forward = time_delta * camera_speed_forward;
-
-        let side_movement = camera_transform.local_x();
-        let forward_movement = camera_transform.local_z();
-
-        camera_transform.rotate(Quat::from_rotation_z(camera_rotation_angle_horizontal) * Quat::from_axis_angle(side_movement, camera_rotation_angle_vertical));
-        camera_transform.translation.z += camera_vertical;
-        camera_transform.translation +=  (Vec3::new(forward_movement.x,forward_movement.y,0.) * -camera_forward) + (side_movement * camera_horizontal);
-    }
     
+}
+
+fn camera_controls(
+    mut camera_query: Query<&mut Transform, (With<Camera>, Without<Shape>)>,
+    keyboard: Res<Input<KeyCode>>, 
+    time: Res<Time>,
+    mut contexts: bevy_egui::EguiContexts,
+){
+
+    if !contexts.ctx_mut().is_pointer_over_area() && !contexts.ctx_mut().wants_keyboard_input(){
+        for mut camera_transform in &mut camera_query {
+
+            let boost = if keyboard.pressed(KeyCode::ShiftLeft) {2.} else {0.};
+            let speed = 2. + boost;
+    
+            // Define the camera's rotation speed in radians per second
+            let camera_rotation_speed_horizontal = 
+                if keyboard.pressed(KeyCode::Q)||keyboard.pressed(KeyCode::Left){
+                    speed
+                }
+                else if keyboard.pressed(KeyCode::E)||keyboard.pressed(KeyCode::Right) {
+                    -speed
+                }
+                else {
+                    0.0
+            };
+    
+            let camera_rotation_speed_vertical = 
+                if keyboard.pressed(KeyCode::R)||keyboard.pressed(KeyCode::Up){
+                    speed
+                }
+                else if keyboard.pressed(KeyCode::F)||keyboard.pressed(KeyCode::Down) {
+                    -speed
+                }
+                else {
+                    0.0
+            };
+    
+            let camera_speed_horizontal = 
+                if keyboard.pressed(KeyCode::D){
+                    speed
+                }
+                else if keyboard.pressed(KeyCode::A) {
+                    -speed
+                }
+                else {
+                    0.0
+            };
+    
+            let camera_speed_forward = 
+                if keyboard.pressed(KeyCode::W){
+                    speed
+                }
+                else if keyboard.pressed(KeyCode::S) {
+                    -speed
+                }
+                else {
+                    0.0
+            };
+    
+            let camera_speed_vertical =
+            if keyboard.pressed(KeyCode::Space){
+                speed
+            }
+            else if keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::C) {
+                -speed
+            }
+            else {
+                0.0
+            };
+    
+            let time_delta = time.delta_seconds();
+    
+            // Calculate the camera's rotation angle based on time and speed
+            let camera_rotation_angle_horizontal = time_delta * camera_rotation_speed_horizontal;
+            let camera_rotation_angle_vertical = time_delta * camera_rotation_speed_vertical;
+            let camera_vertical = time_delta * camera_speed_vertical;
+            let camera_horizontal = time_delta * camera_speed_horizontal;
+            let camera_forward = time_delta * camera_speed_forward;
+    
+            let side_movement = camera_transform.local_x();
+            let forward_movement = camera_transform.local_z();
+    
+            camera_transform.rotate(Quat::from_rotation_z(camera_rotation_angle_horizontal) * Quat::from_axis_angle(side_movement, camera_rotation_angle_vertical));
+            camera_transform.translation.z += camera_vertical;
+            camera_transform.translation +=  (Vec3::new(forward_movement.x,forward_movement.y,0.) * -camera_forward) + (side_movement * camera_horizontal);
+        }
+    }
+
 }
 
 fn ui_overlay(mut contexts: EguiContexts, mut defined_color: ResMut<DefinedColorResource>){
     //Move current resource values to mutable variables for sliders
     let (mut red, mut green, mut blue) = defined_color.component_limit.to_tuple();
     let (mut red_gamma, mut green_gamma, mut blue_gamma) = defined_color.gamma.to_tuple();
-    let (mut yellow_adjust, mut cyan_adjust, mut magenta_adjust) = defined_color.hue_adjust.to_tuple();
+    let (mut hue_adjust, mut chroma_adjust, mut luminance_adjust) = defined_color.hcl_adjust;
 
     //Create window for variable sliders
     egui::Window::new("Spherical RGB Adjust").show(contexts.ctx_mut(), |ui|{
@@ -221,10 +229,10 @@ fn ui_overlay(mut contexts: EguiContexts, mut defined_color: ResMut<DefinedColor
         ui.add(egui::Slider::new( &mut red_gamma ,0.1..=3.0).text("Red"));
         ui.add(egui::Slider::new( &mut green_gamma ,0.1..=3.0).text("Green"));
         ui.add(egui::Slider::new( &mut blue_gamma ,0.1..=3.0).text("Blue"));
-        ui.label("Hue Adjust");
-        ui.add(egui::Slider::new( &mut yellow_adjust ,0.1..=3.0).text("Yellow"));
-        ui.add(egui::Slider::new( &mut cyan_adjust ,0.1..=3.0).text("Cyan"));
-        ui.add(egui::Slider::new( &mut magenta_adjust ,0.1..=3.0).text("Magenta"));
+        ui.label("HCL Adjust");
+        ui.add(egui::Slider::new( &mut hue_adjust ,1..=48).text("Hue"));
+        ui.add(egui::Slider::new( &mut chroma_adjust ,1..=24).text("Chroma"));
+        ui.add(egui::Slider::new( &mut luminance_adjust ,1..=16).text("Luminance"));
 
     });
 
@@ -232,13 +240,13 @@ fn ui_overlay(mut contexts: EguiContexts, mut defined_color: ResMut<DefinedColor
     let slider_changed = 
         (red,green,blue) != defined_color.component_limit.to_tuple() ||
         (red_gamma,green_gamma,blue_gamma) != defined_color.gamma.to_tuple() ||
-        (yellow_adjust,cyan_adjust,magenta_adjust) != defined_color.hue_adjust.to_tuple();
+        (hue_adjust,chroma_adjust,luminance_adjust) != defined_color.hcl_adjust;
 
     if slider_changed{
         //Update values to Resource
         defined_color.component_limit = SColor::from_tuple((red,green,blue));
         defined_color.gamma = Gamma::new(red_gamma,green_gamma,blue_gamma);
-        defined_color.hue_adjust = Gamma::new(yellow_adjust,cyan_adjust,magenta_adjust);
+        defined_color.hcl_adjust = (hue_adjust,chroma_adjust,luminance_adjust);
 
         //Update mesh
         //todo
@@ -351,7 +359,7 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, defined_color: DefinedCol
 fn draw_spherical_colorspace(defined_color: DefinedColorResource) -> Vec<Mesh>{
     let mut colorspace_meshes  = Vec::<Mesh>::new();
 
-    let (h_step,s_step,v_step) = (24, 12, 8);
+    let (h_step,s_step,v_step) = defined_color.hcl_adjust;
 
     for v in 0..v_step {
         let s_step_adjusted = s_step/(v_step-v);
