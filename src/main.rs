@@ -408,9 +408,19 @@ fn draw_spherical_colorspace(settings: VisualizationSettings) -> Vec<Mesh>{
 
     let (h_step,s_step,v_step) = settings.hcl_adjust;
 
+    let gamma_transform = if settings.gamma_deform {settings.gamma.clone()} else { Gamma::new(1.,1.,1.).clone() };
+
+    let shape_fn = 
+        match settings.visualization_shape {
+        VisualiztionShape::Spherical =>
+            spherical_hcl,
+        VisualiztionShape::Cubic =>
+            cubic_hsv,
+        };
+
     for v in 0..v_step {
-        let s_step_adjusted = s_step/(v_step-v);
-        for s in 0..s_step_adjusted {
+        // let s_step_adjusted = (s_step as f32*(v as f32 /v_step as f32)) as u8;
+        for s in 0..s_step/*_adjusted*/ {
             for h in  0..h_step{   
 
                 // let (red, green, blue) = spherical_hcl(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32).to_tuple();
@@ -421,8 +431,10 @@ fn draw_spherical_colorspace(settings: VisualizationSettings) -> Vec<Mesh>{
                 //     break;
                 // }
 
+                // let (chroma,mut  chroma_next) = (1.-(s as f32 /(s_step/(v_step-v)) as f32), 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32));
+
                 let (hue,hue_next) = (h as f32 / h_step as f32, ((h+1) % h_step) as f32 / h_step as f32);
-                let (chroma,mut  chroma_next) = (1.-(s as f32 /(s_step/(v_step-v)) as f32), 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32));
+                let (chroma,mut  chroma_next) = (s as f32 / s_step as f32, (s + 1) as f32 / s_step as f32);
                 let (luminance,mut  luminance_next) = (v as f32 / v_step as f32, (v + 1) as f32 / v_step as f32);
 
                 if settings.invert_visualization {
@@ -432,19 +444,7 @@ fn draw_spherical_colorspace(settings: VisualizationSettings) -> Vec<Mesh>{
                     luminance_next = luminance;
                 }
 
-                let (v0, v1, v2, v3);
-
-                let spherical_fn: fn (f32, f32, f32) -> SColor = spherical_hcl;
-                let cubic_fn: fn (f32, f32, f32) -> SColor = cubic_hsv;
-
-                let gamma_transform = if settings.gamma_deform {settings.gamma.clone()} else { Gamma::new(1.,1.,1.).clone() };
-
-                match settings.visualization_shape {
-                    VisualiztionShape::Spherical =>
-                        (v0,v1,v2,v3)= get_four_points(spherical_fn, gamma_transform, hue, hue_next, chroma, chroma_next, luminance, luminance_next),
-                    VisualiztionShape::Cubic =>
-                        (v0,v1,v2,v3)= get_four_points(cubic_fn, gamma_transform, hue, hue_next, chroma, chroma_next, luminance, luminance_next),
-                }
+                let (v0, v1, v2, v3) = get_four_points(shape_fn, gamma_transform, hue, hue_next, chroma, chroma_next, luminance, luminance_next);
 
                 colorspace_meshes.push(create_quad(
                     v0,
