@@ -4,7 +4,6 @@
 
 use spherical_rgb::{Color as SColor, DefinedColor, Gamma, spherical_hcl, cubic_hsv};
 use std::{f32::consts::PI};
-mod ui;
 
 
 use bevy::{
