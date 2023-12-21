@@ -10,3 +10,4 @@ bevy = "0.12"
 egui = "0.24"
 bevy_egui = "0.23"
 spherical_rgb = { path = "../spherical_rgb"}
+wasm-bindgen = "0.2.87"

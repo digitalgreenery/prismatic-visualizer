@@ -3234,6 +3234,7 @@ dependencies = [
  "bevy_egui",
  "egui 0.24.1",
  "spherical_rgb",
+ "wasm-bindgen",
 ]
 
 [[package]]
