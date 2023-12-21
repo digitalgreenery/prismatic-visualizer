@@ -252,17 +252,27 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
         ui.add(egui::Slider::new( &mut hue_adjust ,3..=48).text("Hue"));
         ui.add(egui::Slider::new( &mut chroma_adjust ,1..=24).text("Chroma"));
         ui.add(egui::Slider::new( &mut luminance_adjust ,1..=16).text("Luminance"));
+
         ui.separator();
+
         ui.label("Shape");
         ui.horizontal(|ui| {
             ui.radio_value(&mut v_shape, VisualiztionShape::Spherical, "Sphere");
             ui.radio_value(&mut v_shape, VisualiztionShape::Cubic, "Cube");
         });
+
         ui.separator();
+
         ui.label("Additional Settings");
         ui.checkbox(&mut discrete_color, "Discrete Color");
         ui.checkbox(&mut gamma_deform, "Gamma Deform");
         ui.checkbox(&mut invert_vis, "Invert Visualization");
+
+        ui.separator();
+
+        ui.label("WASD - Horizontal Movement");
+        ui.label("Ctrl & Space - Vertical Movement");
+        ui.label("Arrow Keys - Camera");
     });
 
     //Check if slider has been changed
