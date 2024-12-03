@@ -1,10 +1,11 @@
 //Digital Greenery
-//Spherical RGB Visualizer
+//Prismatic Color Visualizer
 
 
-use spherical_rgb::{Color as SColor, DefinedColor, Gamma, spherical_hcl, cubic_hsv};
-// use std::{f32::consts::PI};
-
+use bevy::render::render_asset::RenderAssetUsages;
+use prismatic_color::{constants as Colors, Color as P_Color, ColorType, IntoColor};
+use std::f32::consts::PI;
+use bevy::input::mouse::{MouseMotion, MouseButtonInput};
 
 use bevy::{
     prelude::{*},
@@ -12,6 +13,17 @@ use bevy::{
     render::mesh::Indices,
 };
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+
+trait BevyColorConvert {
+    fn to_bevy_color(&self) -> Color;
+}
+
+impl BevyColorConvert for P_Color {
+    fn to_bevy_color(&self) -> Color {
+        let color = self.to_rgb().to_array();
+        Color::srgba(color[0], color[1], color[2], color[3])
+    }
+}
 
 fn main() {
     App::new()
@@ -22,7 +34,7 @@ fn main() {
         .run();
 }
 
-/// A marker component for our components so we can query them separately from the ground plane
+// A marker component for our components so we can query them separately from the ground plane
 #[derive(Component)]
 struct Shape;
 
@@ -31,20 +43,76 @@ struct SphericalVisualizationMeshes;
 
 #[derive(Resource, Clone)]
 struct VisualizationSettings{
-    component_limit: SColor,
-    gamma: Gamma,
+    scale: f32,
+    component_limit: (f32,f32,f32),
+    gamma: (f32,f32,f32),
     hcl_adjust: (u8,u8,u8),
-    visualization_needs_updated: bool,
-    visualization_shape: VisualiztionShape,
+    color_model: ColorType,
+    is_instance_visualization: bool,
+    mesh_shape: MeshShape,
+    quad_shape: SlicingMethod,
     gamma_deform: bool,
     discrete_color: bool,
-    invert_visualization: bool,
 }
 
-#[derive(Clone, PartialEq, Eq)]
-enum VisualiztionShape{
-    Spherical,
-    Cubic,
+impl Default for VisualizationSettings{
+    fn default() -> Self {
+        Self {
+            scale: 1.,
+            component_limit: (1., 1., 1.), 
+            gamma: (2.2, 2.2, 2.2), 
+            hcl_adjust: (24,8,8),
+            color_model: ColorType::SphericalHCLA,
+            is_instance_visualization: true,
+            mesh_shape: MeshShape::Sphere,
+            quad_shape: SlicingMethod::Axial,
+            gamma_deform: false,
+            discrete_color: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ColorQuad {
+    points: [P_Color;4],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SlicingMethod {
+    Radial,           // Hold hue constant, vary chroma and lightness
+    Axial,            // Hold chroma constant, vary hue and lightness
+    Concentric, // Hold lightness constant, vary hue and chroma
+}
+
+impl SlicingMethod {
+    fn get_offsets(&self) -> [[f32; 3]; 4] {
+        match self {
+            SlicingMethod::Radial => [
+                [0.0, 0.0, 0.0], // Point 1: Base point
+                [0.0, 1.0, 0.0], // Point 2: Vary chroma
+                [0.0, 1.0, 1.0], // Point 3: Vary chroma and lightness
+                [0.0, 0.0, 1.0], // Point 4: Vary lightness
+            ],
+            SlicingMethod::Concentric => [
+                [0.0, 0.0, 0.0], // Point 1: Base point
+                [1.0, 0.0, 0.0], // Point 2: Vary hue
+                [1.0, 0.0, 1.0], // Point 3: Vary hue and lightness
+                [0.0, 0.0, 1.0], // Point 4: Vary lightness
+            ],
+            SlicingMethod::Axial => [
+                [0.0, 0.0, 0.0], // Point 1: Base point
+                [1.0, 0.0, 0.0], // Point 2: Vary hue
+                [1.0, 1.0, 0.0], // Point 3: Vary hue and chroma
+                [0.0, 1.0, 0.0], // Point 4: Vary chroma
+            ],
+        }
+    }
+}
+
+#[derive(Clone,PartialEq)]
+enum MeshShape {
+    Sphere,
+    Cube,
 }
 
 // const X_EXTENT: f32 = 14.5;
@@ -52,80 +120,23 @@ const SCALE: f32 = 5.0;
 
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
+    meshes: ResMut<Assets<Mesh>>,
     // mut images: ResMut<Assets<Image>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    materials: ResMut<Assets<StandardMaterial>>,
 ) {
 
-    // let debug_material = materials.add(StandardMaterial {
-    //     base_color_texture: Some(images.add(uv_debug_texture())),
-    //     ..default()
-    // });
+    commands.spawn((
+        Camera3d {..Default::default()},
+        Transform::from_xyz(SCALE*2., SCALE*2., SCALE*2.).looking_at(Vec3::new(0., 0., 0.), Vec3::Z),
+    ));
 
-    // let shapes = [
-    //     meshes.add(shape::Cube::default().into()),
-    //     meshes.add(shape::Icosphere::default().try_into().unwrap()),
-    //     meshes.add(shape::UVSphere::default().into()),
-    // ];
-
-    // let num_shapes = shapes.len();
-
-    // for (i, shape) in shapes.into_iter().enumerate() {
-    //     commands.spawn((
-    //         PbrBundle {
-    //             mesh: shape,
-    //             material: debug_material.clone(),
-    //             transform: Transform::from_xyz(
-    //                 -X_EXTENT / 2. + i as f32 / (num_shapes - 1) as f32 * X_EXTENT,
-    //                 7.0,
-    //                 1.0,
-    //             )
-    //             .with_rotation(Quat::from_rotation_x(-PI / 4.)),
-    //             ..default()
-    //         },
-    //         Shape,
-    //     ));
-    // }
-
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 9000.0,
-            range: 100.,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(8.0, 16.0, 16.0),
-        ..default()
-    });
-
-    // // ground plane
-    // commands.spawn(PbrBundle {
-    //     mesh: meshes.add(shape::Plane::from_size(100.0).into()),
-    //     material: materials.add(Color::SILVER.into()),
-    //     transform: Transform::from_xyz(0.,0.,-0.1).with_rotation( Quat::from_rotation_x(PI/2.)),
-    //     ..default()
-    // });
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(SCALE*2., SCALE*2., SCALE*2.).looking_at(Vec3::new(0., 0., 0.), Vec3::Z),
-        ..default()
-    });
-
-    let settings = VisualizationSettings{ 
-        component_limit: SColor::new(1., 1., 1.), 
-        gamma: Gamma::new(2., 1.3, 1.9), 
-        hcl_adjust: (24,8,8), 
-        visualization_needs_updated: false, 
-        visualization_shape: VisualiztionShape::Spherical,
-        gamma_deform: false,
-        discrete_color: true,
-        invert_visualization: false,
-    };
+    let settings = VisualizationSettings::default();
 
     let settings_copy = settings.clone();
 
     commands.insert_resource(settings);
 
-    spawn_spherical_visualization(commands, meshes, materials, settings_copy);
+    spawn_spherical_visualization(commands, meshes, materials, &settings_copy);
 
  
 }
@@ -134,18 +145,19 @@ fn rotate(mut query: Query<&mut Transform, With<Shape>>,
     time: Res<Time>) {
     
     for mut transform in &mut query {
-        transform.rotate_y(time.delta_seconds() / 2.);
+        transform.rotate_y(time.delta_secs() / 2.);
     }
     
 }
 
 fn camera_controls(
     mut camera_query: Query<&mut Transform, (With<Camera>, Without<Shape>)>,
-    keyboard: Res<Input<KeyCode>>, 
+    keyboard: Res<ButtonInput<KeyCode>>,
+    // mouse_button: Res<MouseButton>,
+    // mouse_motion: Res<MouseMotion>,
     time: Res<Time>,
     mut contexts: bevy_egui::EguiContexts,
 ){
-
     if !contexts.ctx_mut().is_pointer_over_area() && !contexts.ctx_mut().wants_keyboard_input(){
         for mut camera_transform in &mut camera_query {
 
@@ -154,10 +166,10 @@ fn camera_controls(
     
             // Define the camera's rotation speed in radians per second
             let camera_rotation_speed_horizontal = 
-                if keyboard.pressed(KeyCode::Q)||keyboard.pressed(KeyCode::Left){
+                if keyboard.pressed(KeyCode::KeyQ)||keyboard.pressed(KeyCode::ArrowLeft){
                     speed
                 }
-                else if keyboard.pressed(KeyCode::E)||keyboard.pressed(KeyCode::Right) {
+                else if keyboard.pressed(KeyCode::KeyE)||keyboard.pressed(KeyCode::ArrowRight) {
                     -speed
                 }
                 else {
@@ -165,10 +177,10 @@ fn camera_controls(
             };
     
             let camera_rotation_speed_vertical = 
-                if keyboard.pressed(KeyCode::R)||keyboard.pressed(KeyCode::Up){
+                if keyboard.pressed(KeyCode::KeyR)||keyboard.pressed(KeyCode::ArrowUp){
                     speed
                 }
-                else if keyboard.pressed(KeyCode::F)||keyboard.pressed(KeyCode::Down) {
+                else if keyboard.pressed(KeyCode::KeyF)||keyboard.pressed(KeyCode::ArrowDown) {
                     -speed
                 }
                 else {
@@ -176,10 +188,10 @@ fn camera_controls(
             };
     
             let camera_speed_horizontal = 
-                if keyboard.pressed(KeyCode::D){
+                if keyboard.pressed(KeyCode::KeyD){
                     speed
                 }
-                else if keyboard.pressed(KeyCode::A) {
+                else if keyboard.pressed(KeyCode::KeyA) {
                     -speed
                 }
                 else {
@@ -187,10 +199,10 @@ fn camera_controls(
             };
     
             let camera_speed_forward = 
-                if keyboard.pressed(KeyCode::W){
+                if keyboard.pressed(KeyCode::KeyW){
                     speed
                 }
-                else if keyboard.pressed(KeyCode::S) {
+                else if keyboard.pressed(KeyCode::KeyS) {
                     -speed
                 }
                 else {
@@ -201,14 +213,14 @@ fn camera_controls(
             if keyboard.pressed(KeyCode::Space){
                 speed
             }
-            else if keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::C) {
+            else if keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::KeyC) {
                 -speed
             }
             else {
                 0.0
             };
     
-            let time_delta = time.delta_seconds();
+            let time_delta = time.delta_secs();
     
             // Calculate the camera's rotation angle based on time and speed
             let camera_rotation_angle_horizontal = time_delta * camera_rotation_speed_horizontal;
@@ -217,8 +229,8 @@ fn camera_controls(
             let camera_horizontal = time_delta * camera_speed_horizontal;
             let camera_forward = time_delta * camera_speed_forward;
     
-            let side_movement = camera_transform.local_x();
-            let forward_movement = camera_transform.local_z();
+            let side_movement = camera_transform.local_x().as_vec3();
+            let forward_movement = camera_transform.local_z().as_vec3();
     
             camera_transform.rotate(Quat::from_rotation_z(camera_rotation_angle_horizontal) * Quat::from_axis_angle(side_movement, camera_rotation_angle_vertical));
             camera_transform.translation.z += camera_vertical;
@@ -229,94 +241,141 @@ fn camera_controls(
 }
 
 fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSettings>){
-    //Move current resource values to mutable variables for sliders
-    let (mut red, mut green, mut blue) = settings.component_limit.to_tuple();
-    let (mut red_gamma, mut green_gamma, mut blue_gamma) = settings.gamma.to_tuple();
-    let (mut hue_adjust, mut chroma_adjust, mut luminance_adjust) = settings.hcl_adjust;
-    let mut v_shape = settings.visualization_shape.clone();
-    let mut discrete_color = settings.discrete_color.clone();
-    let mut gamma_deform = settings.gamma_deform.clone();
-    let mut invert_vis = settings.invert_visualization.clone();
 
     //Create window for variable sliders
-    egui::Window::new("Spherical RGB Adjust").show(contexts.ctx_mut(), |ui|{
-        ui.label("Component Bounds");
-        ui.add(egui::Slider::new( &mut red ,0.0..=1.0).text("Red"));
-        ui.add(egui::Slider::new( &mut green ,0.0..=1.0).text("Green"));
-        ui.add(egui::Slider::new( &mut blue ,0.0..=1.0).text("Blue"));
+    egui::Window::new("Spherical RGB Adjust").resizable(false).anchor(egui::Align2::LEFT_TOP, [5.,5.]).show(contexts.ctx_mut(), |ui|{
+        
+        ui.set_max_width(ui.available_width()/2.);
+
+        ui.label("Scale");
+        ui.add(egui::Slider::new( &mut settings.scale ,0.0..=1.0).text("Scale"));
+
+        ui.label("Perceptual Offset");
+        ui.add(egui::Slider::new( &mut settings.component_limit.0 ,0.0..=1.0).text("Red"));
+        ui.add(egui::Slider::new( &mut settings.component_limit.1 ,0.0..=1.0).text("Green"));
+        ui.add(egui::Slider::new( &mut settings.component_limit.2 ,0.0..=1.0).text("Blue"));
         ui.label("Gamma");
-        ui.add(egui::Slider::new( &mut red_gamma ,0.1..=3.0).text("Red"));
-        ui.add(egui::Slider::new( &mut green_gamma ,0.1..=3.0).text("Green"));
-        ui.add(egui::Slider::new( &mut blue_gamma ,0.1..=3.0).text("Blue"));
-        ui.label("HCL Adjust");
-        ui.add(egui::Slider::new( &mut hue_adjust ,3..=48).text("Hue"));
-        ui.add(egui::Slider::new( &mut chroma_adjust ,1..=24).text("Chroma"));
-        ui.add(egui::Slider::new( &mut luminance_adjust ,1..=16).text("Luminance"));
+        ui.add(egui::Slider::new( &mut settings.gamma.0 ,0.1..=3.0).text("Red"));
+        ui.add(egui::Slider::new( &mut settings.gamma.1 ,0.1..=3.0).text("Green"));
+        ui.add(egui::Slider::new( &mut settings.gamma.2 ,0.1..=3.0).text("Blue"));
+        ui.label("HCL");
+        ui.add(egui::Slider::new( &mut settings.hcl_adjust.0 ,1..=48).text("Hue"));
+        ui.add(egui::Slider::new( &mut settings.hcl_adjust.1 ,1..=24).text("Chroma"));
+        ui.add(egui::Slider::new( &mut settings.hcl_adjust.2 ,1..=24).text("Luma"));
+        ui.separator();
+
+        ui.label("Color Space");
+        ui.horizontal(|ui| {
+            ui.radio_value(&mut settings.color_model, ColorType::SphericalHCLA, "Spherical");
+            ui.radio_value(&mut settings.color_model, ColorType::CubicHSVA, "Cubic");
+        });
 
         ui.separator();
 
         ui.label("Shape");
         ui.horizontal(|ui| {
-            ui.radio_value(&mut v_shape, VisualiztionShape::Spherical, "Sphere");
-            ui.radio_value(&mut v_shape, VisualiztionShape::Cubic, "Cube");
+            ui.radio_value(&mut settings.is_instance_visualization, true, "Shapes");
+            ui.radio_value(&mut settings.is_instance_visualization, false, "Slices");
         });
+  
+        if settings.is_instance_visualization {
+            ui.label("Mesh Shape");
+            ui.horizontal(|ui| {
+                ui.radio_value(&mut settings.mesh_shape, MeshShape::Sphere, "Spheres");
+                ui.radio_value(&mut settings.mesh_shape, MeshShape::Cube, "Cubes");
+            });
+        }
+        else {
+            ui.label("Quad Direction");
+            ui.horizontal(|ui| {
+                ui.radio_value(&mut settings.quad_shape, SlicingMethod::Axial, "Axial");
+                ui.radio_value(&mut settings.quad_shape, SlicingMethod::Radial, "Radial");
+                ui.radio_value(&mut settings.quad_shape, SlicingMethod::Concentric, "Concentric");
+            });
+        }
 
         ui.separator();
 
         ui.label("Additional Settings");
-        ui.checkbox(&mut discrete_color, "Discrete Color");
-        ui.checkbox(&mut gamma_deform, "Gamma Deform");
-        ui.checkbox(&mut invert_vis, "Invert Visualization");
+        ui.checkbox(&mut settings.discrete_color, "Discrete Color");
+        ui.checkbox(&mut settings.gamma_deform, "Gamma Deform");
 
         ui.separator();
 
         ui.label("WASD - Horizontal Movement");
         ui.label("Ctrl & Space - Vertical Movement");
         ui.label("Arrow Keys - Camera");
+
     });
 
-    //Check if slider has been changed
-    let slider_changed = 
-        (red,green,blue) != settings.component_limit.to_tuple() ||
-        (red_gamma,green_gamma,blue_gamma) != settings.gamma.to_tuple() ||
-        (hue_adjust,chroma_adjust,luminance_adjust) != settings.hcl_adjust ||
-        (v_shape != settings.visualization_shape)||
-        (discrete_color != settings.discrete_color)||
-        (gamma_deform != settings.gamma_deform)||
-        (invert_vis != settings.invert_visualization);
+    // egui::Window::new("Colorspace Info").resizable(false).anchor(egui::Align2::RIGHT_TOP, [5.,-5.]).show(contexts.ctx_mut(), |ui|{
+       
+    //     ui.collapsing("Quaternary Peaks", |ui| {
+    //     //    ui.painter().rect_filled(egui::Rect::from_two_pos(egui::Pos2::ZERO, egui::Pos2::new(200., 200.)), egui::Rounding::ZERO, egui::Color32::from_rgb(255,0,0));
+    //         ui.painter().circle(
+    //             egui::Pos2{x:250.0,y:250.0},
+    //             50.0, 
+    //             egui::Color32::from_rgb(255,0,0), 
+    //             egui::Stroke{width: 5.0, color: egui::Color32::from_rgb(255,0,0)}
+    //         );
+        
+    //     });
 
-    if slider_changed{
-        //Update values to Resource
-        settings.visualization_needs_updated = true;
-        settings.component_limit = SColor::from_tuple((red,green,blue));
-        settings.gamma = Gamma::new(red_gamma,green_gamma,blue_gamma);
-        settings.hcl_adjust = (hue_adjust,chroma_adjust,luminance_adjust);
-        settings.visualization_shape = v_shape;
-        settings.discrete_color = discrete_color;
-        settings.gamma_deform = gamma_deform;
-        settings.invert_visualization = invert_vis;
+    // });
+   
+}
 
+fn generate_quads(settings: &VisualizationSettings) -> Vec<ColorQuad> {
+    let (h_steps,c_steps,l_steps) = settings.hcl_adjust;
+    let method: SlicingMethod = settings.quad_shape;
+    let color_model: ColorType = settings.color_model;
+    
+    let (h_steps,c_steps,l_steps) = (1. / h_steps as f32, 1. / c_steps as f32, 1. / l_steps as f32 );
+    let offsets = method.get_offsets(); // Get the offsets for this slicing method
+    let mut quads = Vec::new();
+    let one: f32 = 1.;
+
+    for h in (0..).map(|x| x as f32 * h_steps).take_while(|&h| h + h_steps <= 1.0) {
+        for c in (0..).map(|y| y as f32 * c_steps).take_while(|&c| c + c_steps <= 1.0) {
+            for l in (0..).map(|z| z as f32 * l_steps).take_while(|&l| l + l_steps <= 1.0) {
+                // Generate the four points of the quad
+                let points: [P_Color; 4] = std::array::from_fn(|n| {
+                    (
+                        h + offsets[n][0] * h_steps,
+                        c + offsets[n][1] * c_steps,
+                        l + offsets[n][2] * l_steps,
+                        one,
+                    )
+                    .into_color(color_model)
+                });
+
+                // Add the quad to the list
+                quads.push(ColorQuad {points: points});
+            }
+        }
     }
+
+    quads
 }
 
 fn update_visualization(
     mut commands: Commands,
-    mut defined_color: ResMut<VisualizationSettings>,
+    visualization_settings: ResMut<VisualizationSettings>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
     entities: Query<Entity, With<SphericalVisualizationMeshes>>)
 {
-    if defined_color.visualization_needs_updated {
-        defined_color.visualization_needs_updated = false;
+
+
+    if visualization_settings.is_changed() {
 
         //Delete previous visualization 
         for mesh in entities.iter(){
             commands.entity(mesh).despawn();
         }
-    
-    let defined_color_copy = defined_color.clone();
-
-        spawn_spherical_visualization(commands, meshes, materials, defined_color_copy);
+ 
+    spawn_spherical_visualization(commands, meshes, materials, & *visualization_settings);
+ 
     }
 }
 
@@ -324,81 +383,124 @@ fn spawn_spherical_visualization(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    defined_color: VisualizationSettings)
+    settings: &VisualizationSettings)
 {
+    let (x_scale,y_scale,z_scale) = (settings.scale,settings.scale,settings.scale);
 
-    let (x_scale, y_scale, z_scale) = defined_color.component_limit.to_tuple();
+    if settings.is_instance_visualization {
+        
+    } else {
+        let quad_meshes: Vec<Mesh> = generate_quads(&settings).iter().map(|color_quad| create_quad(color_quad.clone(), settings)).collect();
 
-    let spherical_rgb_meshes = draw_spherical_colorspace(defined_color);
-    for(_index, mesh) in spherical_rgb_meshes.iter().enumerate() {
-        commands.spawn((
-            PbrBundle {
-                mesh: meshes.add(mesh.clone()),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::rgb(1.,1.,1.),
+        
+
+        for mesh in quad_meshes {
+            commands.spawn((
+                Mesh3d(meshes.add(mesh.clone())),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::WHITE,
                     unlit: true,
                     cull_mode: None,
-                    emissive: Color::rgb(1.0, 1.0, 1.0),// Set emissive color
+                    emissive: Color::WHITE.to_linear(),
                     ..Default::default()
+                })),
+                Transform::from_scale(Vec3 {
+                    x: SCALE * x_scale,
+                    y: SCALE * y_scale,
+                    z: SCALE * z_scale,
                 }),
-                transform: Transform::from_scale(Vec3 { x: SCALE*x_scale, y: SCALE*y_scale, z: SCALE*z_scale }),
-                ..Default::default()
-            },
-            SphericalVisualizationMeshes,
-        ));
-
+                GlobalTransform::default(), // This is required for the Transform system
+                Visibility::default(),      // To control rendering visibility
+                InheritedVisibility::default(), // For frustum culling
+                SphericalVisualizationMeshes,
+            ));
+        }
+        
     }
 
 }
 
-fn get_four_points(f: fn(f32,f32,f32)-> SColor, gamma: Gamma, hue: f32, hue_next: f32, chroma: f32, chroma_next: f32, luminance: f32, luminance_next: f32)-> (Vec3,Vec3,Vec3,Vec3){
-    (
-        Vec3::from(gamma.apply_gamma(&f(hue,chroma, luminance)).to_tuple()),
-        Vec3::from(gamma.apply_gamma(&f(hue_next, chroma, luminance)).to_tuple()),
-        Vec3::from(gamma.apply_gamma(&f(hue, chroma_next, luminance_next)).to_tuple()),
-        Vec3::from(gamma.apply_gamma(&f(hue_next, chroma_next, luminance_next)).to_tuple()),
-    )
-}
-
-fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, settings: VisualizationSettings) -> Mesh {
-    
-
-    let (r_gamma,g_gamma,b_gamma) = if settings.gamma_deform {(1.,1.,1.)} else {settings.gamma.to_tuple()};
+fn create_quad(color_quad: ColorQuad, settings: &VisualizationSettings) -> Mesh {
+    let (r_gamma,g_gamma,b_gamma) = if settings.gamma_deform {(1.,1.,1.)} else {settings.gamma};
     let gamma_adjust = 2.2;
-    let gamma = Gamma::new(r_gamma/gamma_adjust,g_gamma/gamma_adjust,b_gamma/gamma_adjust);
-    let (c0,c1,c2,c3) = (
-        DefinedColor::new(SColor::new(v0.x,v0.y,v0.z),gamma).to_color(),
-        DefinedColor::new(SColor::new(v1.x,v1.y,v1.z),gamma).to_color(),
-        DefinedColor::new(SColor::new(v2.x,v2.y,v2.z),gamma).to_color(),
-        DefinedColor::new(SColor::new(v3.x,v3.y,v3.z),gamma).to_color(),
-    );
+    let gamma = [
+        (r_gamma/gamma_adjust) as f32,
+        (g_gamma/gamma_adjust) as f32,
+        (b_gamma/gamma_adjust) as f32,
+    ];
+
+    let raw_colors: [P_Color;4] = color_quad.points.map(|color| color.to_rgb());
+    
+    let mut quad: Vec<Vec3> = raw_colors.iter()
+        .map(|color| {
+            let color = color.to_array();
+            Vec3 {x: color[0], y: color[1], z:color[2],}
+        })
+        .collect();
+
+    let chroma:  [f32;4] = color_quad.points.map(|color| color.to_array()[1]);
+
+    let colors: [P_Color;4] = 
+        raw_colors.iter().
+        zip(chroma.iter()).
+        map(|(color, chroma)| 
+            color.
+            remap_rgb_components(
+            *chroma, 
+            settings.component_limit.0, 
+            settings.component_limit.1, 
+            settings.component_limit.2
+            ).
+            component_gamma_transform(
+                gamma[0],
+                gamma[1], 
+                gamma[2],
+            )
+        )
+        .collect::<Vec<P_Color>>()
+        .try_into()
+        .expect("Expected 4 colors");
+
+    if settings.gamma_deform {
+        quad = colors
+        .iter()
+        .map(|color| {
+            let color = color.to_array();
+            Vec3 {x: color[0], y: color[1], z:color[2],}
+        })
+        .collect();
+    }
+
 
     // Create a new mesh using a triangle list topology, where each set of 3 vertices composes a triangle.
-    Mesh::new(PrimitiveTopology::TriangleList)
+    Mesh::new(
+        PrimitiveTopology::TriangleList, 
+        RenderAssetUsages::RENDER_WORLD,
+    )
         // Add 4 vertices, each with its own position attribute (coordinate in
         // 3D space), for each of the corners of the parallelogram.
         .with_inserted_attribute(
             Mesh::ATTRIBUTE_POSITION,
-            vec![v0, v1, v2, v3]
+            quad,
         )
         // Assign color to each vertex based on its xyz values.
         .with_inserted_attribute(
             Mesh::ATTRIBUTE_COLOR,
             
             if settings.discrete_color {
-                vec![
-                    [c0.r, c0.g, c0.b, 1.0],
-                    [c0.r, c0.g, c0.b, 1.0],
-                    [c0.r, c0.g, c0.b, 1.0],
-                    [c0.r, c0.g, c0.b, 1.0],
+                vec! [
+                    colors[0].to_array(),
+                    colors[0].to_array(),
+                    colors[0].to_array(),
+                    colors[0].to_array(),
                 ]
             }
             else {
                 vec![
-                    [c0.r, c0.g, c0.b, 1.0],
-                    [c1.r, c1.g, c1.b, 1.0],
-                    [c2.r, c2.g, c2.b, 1.0],
-                    [c3.r, c3.g, c3.b, 1.0],
+                    colors[0].to_array(),
+                    colors[1].to_array(),
+                    colors[2].to_array(),
+                    colors[3].to_array(),
                 ]
             }
         )
@@ -412,108 +514,13 @@ fn create_quad(v0: Vec3, v1: Vec3, v2: Vec3, v3: Vec3, settings: VisualizationSe
         )
         // After defining all the vertices and their attributes, build each triangle using the
         // indices of the vertices that make it up in a counter-clockwise order.
-        .with_indices(Some(Indices::U32(vec![
+        .with_inserted_indices(Indices::U32(vec![
             // First triangle
             0, 1, 2,
             // Second triangle
-            1, 3, 2
-        ])))
+            2, 3, 0,
+        ]))
 }
-
-fn draw_spherical_colorspace(settings: VisualizationSettings) -> Vec<Mesh>{
-    let mut colorspace_meshes  = Vec::<Mesh>::new();
-
-    let (h_step,s_step,v_step) = settings.hcl_adjust;
-
-    let gamma_transform = if settings.gamma_deform {settings.gamma.clone()} else { Gamma::new(1.,1.,1.).clone() };
-
-    let shape_fn = 
-        match settings.visualization_shape {
-        VisualiztionShape::Spherical =>
-            spherical_hcl,
-        VisualiztionShape::Cubic =>
-            cubic_hsv,
-        };
-
-    for v in 0..=v_step {
-        for s in 0..=s_step{
-            for h in  0..h_step{   
-
-                // let (red, green, blue) = spherical_hcl(h as f32 / h_step as f32,1.-(s as f32 /(s_step/(v_step-v)) as f32),v as f32 / v_step as f32).to_tuple();
-
-                // if  red > defined_color.component_limit.r ||
-                //     green > defined_color.component_limit.g ||
-                //     blue > defined_color.component_limit.b  {
-                //     break;
-                // }
-
-                // let (chroma,mut  chroma_next) = (1.-(s as f32 /(s_step/(v_step-v)) as f32), 1.-((s+1) as f32 /(s_step/(v_step-v)) as f32));
-
-                let (hue,hue_next) = (h as f32 / h_step as f32, ((h+1) % h_step) as f32 / h_step as f32);
-                let (chroma,mut  chroma_next) = (s as f32 / s_step as f32, (s + 1) as f32 / s_step as f32);
-                let (luminance,mut  luminance_next) = (v as f32 / v_step as f32, (v + 1) as f32 / v_step as f32);
-
-                if settings.invert_visualization {
-                    chroma_next = chroma;
-                }
-                else {
-                    luminance_next = luminance;
-                }
-
-                let (v0, v1, v2, v3) = get_four_points(shape_fn, gamma_transform, hue, hue_next, chroma, chroma_next, luminance, luminance_next);
-
-                colorspace_meshes.push(create_quad(
-                    v0,
-                    v1,
-                    v2,
-                    v3,
-                    settings.clone(),
-                ));
-
-            }
-        }
-    }
-
-    return colorspace_meshes;
-    
-}
-
-
-// Creates a colorful test pattern
-// fn uv_debug_texture() -> Image {
-//     const TEXTURE_SIZE: usize = 12;
-
-//     let mut palette = [0; TEXTURE_SIZE*4];
-
-//     for n in 0..TEXTURE_SIZE{
-//         let float_color = DefinedColor::new(spherical_hcl((n)as f32/(TEXTURE_SIZE)as f32, 1.0, 1.0),Gamma::new(2.2,2.2,2.2,)).to_color().to_tuple();
-//         palette[n*4]    =(float_color.0*255.0)as u8;
-//         palette[n*4+1]  =(float_color.1*255.0)as u8;
-//         palette[n*4+2]  =(float_color.2*255.0)as u8;
-//         palette[n*4+3]  =255;
-//         println!("Color {n} is: {float_color:?}");
-//     }
-
-
-//     let mut texture_data = [0; TEXTURE_SIZE * TEXTURE_SIZE * 4];
-//     for y in 0..TEXTURE_SIZE {
-//         let offset = TEXTURE_SIZE * y * 4;
-//         texture_data[offset..(offset + TEXTURE_SIZE * 4)].copy_from_slice(&palette);
-//         palette.rotate_right(4);
-//     }
-
-//     Image::new_fill(
-//         Extent3d {
-//             width: TEXTURE_SIZE as u32,
-//             height: TEXTURE_SIZE as u32,
-//             depth_or_array_layers: 1,
-//         },
-//         TextureDimension::D2,
-//         &texture_data,
-//         TextureFormat::Rgba8UnormSrgb,
-//     )
-// }
-
 
 // struct ToggleCameraRotation(bool);
 // impl bevy::prelude::Resource for ToggleCameraRotation {}
