@@ -1,7 +1,6 @@
 //Digital Greenery
 //Prismatic Color Visualizer
 
-
 use bevy::render::render_asset::RenderAssetUsages;
 use prismatic_color::{constants as Colors, Color as P_Color, ColorType, IntoColor};
 use std::f32::consts::PI;
