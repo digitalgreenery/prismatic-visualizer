@@ -115,6 +115,15 @@ enum MeshShape {
     Cube,
 }
 
+impl MeshShape {
+    fn get_shape(&self) -> Mesh {
+        match self {
+            MeshShape::Sphere => Sphere::new(0.1).into(),
+            MeshShape::Cube => Cuboid::new(0.1,0.1,0.1).into(),
+        }
+    }
+}
+
 // const X_EXTENT: f32 = 14.5;
 const SCALE: f32 = 5.0;
 
@@ -248,7 +257,7 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
         ui.set_max_width(ui.available_width()/2.);
 
         ui.label("Scale");
-        ui.add(egui::Slider::new( &mut settings.scale ,0.0..=1.0).text("Scale"));
+        ui.add(egui::Slider::new( &mut settings.scale ,0.0..=2.0).text("Scale"));
 
         ui.label("Perceptual Offset");
         ui.add(egui::Slider::new( &mut settings.component_limit.0 ,0.0..=1.0).text("Red"));
@@ -325,6 +334,120 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
    
 }
 
+fn update_visualization(
+    mut commands: Commands,
+    visualization_settings: ResMut<VisualizationSettings>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<StandardMaterial>>,
+    entities: Query<Entity, With<SphericalVisualizationMeshes>>)
+{
+
+
+    if visualization_settings.is_changed() {
+
+        //Delete previous visualization 
+        for mesh in entities.iter(){
+            commands.entity(mesh).despawn();
+        }
+ 
+    spawn_spherical_visualization(commands, meshes, materials, & *visualization_settings);
+ 
+    }
+}
+
+fn spawn_spherical_visualization(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    settings: &VisualizationSettings)
+{
+    let (x_scale,y_scale,z_scale) = (settings.scale,settings.scale,settings.scale);
+
+    if settings.is_instance_visualization {
+        let mesh = settings.mesh_shape.get_shape();
+        for color in generate_point_colors(&settings) {
+            let (point, color) = get_point_and_color(color, settings);
+            commands.spawn((
+                Mesh3d(meshes.add(mesh.clone())),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: color.to_bevy_color(),
+                    unlit: true,
+                    cull_mode: None,
+                    emissive: color.to_bevy_color().to_linear(),
+                    ..Default::default()
+                })),
+                Transform::from_translation(point.map(|axis| axis * SCALE))
+                .with_scale(Vec3 {
+                    x: SCALE * x_scale,
+                    y: SCALE * y_scale,
+                    z: SCALE * z_scale,
+                }),
+                GlobalTransform::default(),
+                Visibility::default(),      // To control rendering visibility
+                InheritedVisibility::default(), // For frustum culling
+                SphericalVisualizationMeshes,
+            ));
+        };
+        
+    } else {
+        let quad_meshes: Vec<Mesh> = generate_quads(&settings).iter().map(|color_quad| create_quad(color_quad.clone(), settings)).collect();
+
+        for mesh in quad_meshes {
+            commands.spawn((
+                Mesh3d(meshes.add(mesh.clone())),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::WHITE,
+                    unlit: true,
+                    cull_mode: None,
+                    emissive: Color::WHITE.to_linear(),
+                    ..Default::default()
+                })),
+                Transform::from_scale(Vec3 {
+                    x: SCALE * x_scale,
+                    y: SCALE * y_scale,
+                    z: SCALE * z_scale,
+                }),
+                GlobalTransform::default(), // This is required for the Transform system
+                Visibility::default(),      // To control rendering visibility
+                InheritedVisibility::default(), // For frustum culling
+                SphericalVisualizationMeshes,
+            ));
+        }
+        
+    }
+
+}
+
+fn generate_point_colors(settings: &VisualizationSettings) -> Vec<P_Color> {
+    let (h_steps,c_steps,l_steps) = settings.hcl_adjust;
+    let color_model: ColorType = settings.color_model;
+    
+    let (h_steps,c_steps,l_steps) = (1. / h_steps as f32, 1. / c_steps as f32, 1. / l_steps as f32 );
+    let mut points = Vec::new();
+    let one: f32 = 1.;
+
+    for h in (0..).map(|x| x as f32 * h_steps).take_while(|&h| h + h_steps <= 1.0) {
+        for c in (0..).map(|y| y as f32 * c_steps).take_while(|&c| c + c_steps <= 1.0) {
+            for l in (0..).map(|z| z as f32 * l_steps).take_while(|&l| l + l_steps <= 1.0) {
+                // Generate the four points of the quad
+                let point: P_Color = 
+                    (
+                        h,
+                        c,
+                        l,
+                        one,
+                    )
+                    .into_color(color_model);
+
+                // Add the quad to the list
+                points.push(point);
+            }
+        }
+    }
+
+    points
+}
+
 fn generate_quads(settings: &VisualizationSettings) -> Vec<ColorQuad> {
     let (h_steps,c_steps,l_steps) = settings.hcl_adjust;
     let method: SlicingMethod = settings.quad_shape;
@@ -358,120 +481,10 @@ fn generate_quads(settings: &VisualizationSettings) -> Vec<ColorQuad> {
     quads
 }
 
-fn update_visualization(
-    mut commands: Commands,
-    visualization_settings: ResMut<VisualizationSettings>,
-    meshes: ResMut<Assets<Mesh>>,
-    materials: ResMut<Assets<StandardMaterial>>,
-    entities: Query<Entity, With<SphericalVisualizationMeshes>>)
-{
-
-
-    if visualization_settings.is_changed() {
-
-        //Delete previous visualization 
-        for mesh in entities.iter(){
-            commands.entity(mesh).despawn();
-        }
- 
-    spawn_spherical_visualization(commands, meshes, materials, & *visualization_settings);
- 
-    }
-}
-
-fn spawn_spherical_visualization(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    settings: &VisualizationSettings)
-{
-    let (x_scale,y_scale,z_scale) = (settings.scale,settings.scale,settings.scale);
-
-    if settings.is_instance_visualization {
-        
-    } else {
-        let quad_meshes: Vec<Mesh> = generate_quads(&settings).iter().map(|color_quad| create_quad(color_quad.clone(), settings)).collect();
-
-        
-
-        for mesh in quad_meshes {
-            commands.spawn((
-                Mesh3d(meshes.add(mesh.clone())),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::WHITE,
-                    unlit: true,
-                    cull_mode: None,
-                    emissive: Color::WHITE.to_linear(),
-                    ..Default::default()
-                })),
-                Transform::from_scale(Vec3 {
-                    x: SCALE * x_scale,
-                    y: SCALE * y_scale,
-                    z: SCALE * z_scale,
-                }),
-                GlobalTransform::default(), // This is required for the Transform system
-                Visibility::default(),      // To control rendering visibility
-                InheritedVisibility::default(), // For frustum culling
-                SphericalVisualizationMeshes,
-            ));
-        }
-        
-    }
-
-}
-
 fn create_quad(color_quad: ColorQuad, settings: &VisualizationSettings) -> Mesh {
-    let (r_gamma,g_gamma,b_gamma) = if settings.gamma_deform {(1.,1.,1.)} else {settings.gamma};
-    let gamma_adjust = 2.2;
-    let gamma = [
-        (r_gamma/gamma_adjust) as f32,
-        (g_gamma/gamma_adjust) as f32,
-        (b_gamma/gamma_adjust) as f32,
-    ];
 
-    let raw_colors: [P_Color;4] = color_quad.points.map(|color| color.to_rgb());
-    
-    let mut quad: Vec<Vec3> = raw_colors.iter()
-        .map(|color| {
-            let color = color.to_array();
-            Vec3 {x: color[0], y: color[1], z:color[2],}
-        })
-        .collect();
-
-    let chroma:  [f32;4] = color_quad.points.map(|color| color.to_array()[1]);
-
-    let colors: [P_Color;4] = 
-        raw_colors.iter().
-        zip(chroma.iter()).
-        map(|(color, chroma)| 
-            color.
-            remap_rgb_components(
-            *chroma, 
-            settings.component_limit.0, 
-            settings.component_limit.1, 
-            settings.component_limit.2
-            ).
-            component_gamma_transform(
-                gamma[0],
-                gamma[1], 
-                gamma[2],
-            )
-        )
-        .collect::<Vec<P_Color>>()
-        .try_into()
-        .expect("Expected 4 colors");
-
-    if settings.gamma_deform {
-        quad = colors
-        .iter()
-        .map(|color| {
-            let color = color.to_array();
-            Vec3 {x: color[0], y: color[1], z:color[2],}
-        })
-        .collect();
-    }
-
-
+   let points_and_colors: [(Vec3, P_Color); 4] = color_quad.points.map(|color| get_point_and_color(color, settings));
+   let (quad,colors) = (points_and_colors.map(|(a,_)|a).to_vec(), points_and_colors.map(|(_,b)|b));
     // Create a new mesh using a triangle list topology, where each set of 3 vertices composes a triangle.
     Mesh::new(
         PrimitiveTopology::TriangleList, 
@@ -521,6 +534,47 @@ fn create_quad(color_quad: ColorQuad, settings: &VisualizationSettings) -> Mesh 
             2, 3, 0,
         ]))
 }
+
+fn get_point_and_color(color: P_Color, settings: &VisualizationSettings) -> (Vec3, P_Color){
+    let (r_gamma,g_gamma,b_gamma) = if settings.gamma_deform {(1.,1.,1.)} else {settings.gamma};
+    let gamma_adjust = 2.2;
+    let gamma = [
+        (r_gamma/gamma_adjust) as f32,
+        (g_gamma/gamma_adjust) as f32,
+        (b_gamma/gamma_adjust) as f32,
+    ];
+
+    let raw_color = color.to_rgb();
+    let chroma = color.to_array()[1];
+    
+    let mut point: Vec3 = {
+        let color = raw_color.to_array();
+        Vec3 {x: color[0], y: color[1], z:color[2],}
+    };
+
+    let color: P_Color = 
+        raw_color.
+            remap_rgb_components(
+            chroma, 
+            settings.component_limit.0, 
+            settings.component_limit.1, 
+            settings.component_limit.2
+            ).
+            component_gamma_transform(
+                gamma[0],
+                gamma[1], 
+                gamma[2],
+            );
+
+    if settings.gamma_deform {
+        point = {
+            let color = color.to_array();
+            Vec3 {x: color[0], y: color[1], z:color[2],}
+        };
+    }
+
+    (point, color)
+} 
 
 // struct ToggleCameraRotation(bool);
 // impl bevy::prelude::Resource for ToggleCameraRotation {}
