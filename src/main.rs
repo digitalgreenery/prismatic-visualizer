@@ -42,7 +42,8 @@ struct SphericalVisualizationMeshes;
 
 #[derive(Resource, Clone)]
 struct VisualizationSettings{
-    scale: f32,
+    viz_scale: f32,
+    instance_scale: f32,
     component_limit: (f32,f32,f32),
     gamma: (f32,f32,f32),
     hcl_adjust: (u8,u8,u8),
@@ -57,7 +58,8 @@ struct VisualizationSettings{
 impl Default for VisualizationSettings{
     fn default() -> Self {
         Self {
-            scale: 1.,
+            viz_scale: 1.,
+            instance_scale: 0.1,
             component_limit: (1., 1., 1.), 
             gamma: (2.2, 2.2, 2.2), 
             hcl_adjust: (24,8,8),
@@ -115,10 +117,10 @@ enum MeshShape {
 }
 
 impl MeshShape {
-    fn get_shape(&self) -> Mesh {
+    fn get_shape(&self, scale: f32) -> Mesh {
         match self {
-            MeshShape::Sphere => Sphere::new(0.1).into(),
-            MeshShape::Cube => Cuboid::new(0.1,0.1,0.1).into(),
+            MeshShape::Sphere => Sphere::new(scale).into(),
+            MeshShape::Cube => Cuboid::new(scale,scale,scale).into(),
         }
     }
 }
@@ -256,7 +258,7 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
         ui.set_max_width(ui.available_width()/2.);
 
         ui.label("Scale");
-        ui.add(egui::Slider::new( &mut settings.scale ,0.0..=2.0).text("Scale"));
+        ui.add(egui::Slider::new( &mut settings.viz_scale ,0.0..=2.0).text("Visualization Scale"));
 
         ui.label("Perceptual Offset");
         ui.add(egui::Slider::new( &mut settings.component_limit.0 ,0.0..=1.0).text("Red"));
@@ -291,6 +293,7 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
             ui.horizontal(|ui| {
                 ui.radio_value(&mut settings.mesh_shape, MeshShape::Sphere, "Spheres");
                 ui.radio_value(&mut settings.mesh_shape, MeshShape::Cube, "Cubes");
+                ui.add(egui::Slider::new( &mut settings.instance_scale ,0.0..=2.0).text("Shape Scale"));
             });
         }
         else {
@@ -299,13 +302,14 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
                 ui.radio_value(&mut settings.quad_shape, SlicingMethod::Axial, "Axial");
                 ui.radio_value(&mut settings.quad_shape, SlicingMethod::Radial, "Radial");
                 ui.radio_value(&mut settings.quad_shape, SlicingMethod::Concentric, "Concentric");
+                ui.checkbox(&mut settings.discrete_color, "Discrete Color");
             });
         }
 
         ui.separator();
 
         ui.label("Additional Settings");
-        ui.checkbox(&mut settings.discrete_color, "Discrete Color");
+
         ui.checkbox(&mut settings.gamma_deform, "Gamma Deform");
 
         ui.separator();
@@ -360,10 +364,9 @@ fn spawn_spherical_visualization(
     mut materials: ResMut<Assets<StandardMaterial>>,
     settings: &VisualizationSettings)
 {
-    let (x_scale,y_scale,z_scale) = (settings.scale,settings.scale,settings.scale);
 
     if settings.is_instance_visualization {
-        let mesh = settings.mesh_shape.get_shape();
+        let mesh = settings.mesh_shape.get_shape(settings.instance_scale);
         for color in generate_point_colors(&settings) {
             let (point, color) = get_point_and_color(color, settings);
             commands.spawn((
@@ -375,12 +378,7 @@ fn spawn_spherical_visualization(
                     emissive: color.to_bevy_color().to_linear(),
                     ..Default::default()
                 })),
-                Transform::from_translation(point.map(|axis| axis * SCALE))
-                .with_scale(Vec3 {
-                    x: SCALE * x_scale,
-                    y: SCALE * y_scale,
-                    z: SCALE * z_scale,
-                }),
+                Transform::from_translation(point.map(|axis| axis * SCALE * settings.viz_scale)),
                 GlobalTransform::default(),
                 Visibility::default(),      // To control rendering visibility
                 InheritedVisibility::default(), // For frustum culling
@@ -402,9 +400,9 @@ fn spawn_spherical_visualization(
                     ..Default::default()
                 })),
                 Transform::from_scale(Vec3 {
-                    x: SCALE * x_scale,
-                    y: SCALE * y_scale,
-                    z: SCALE * z_scale,
+                    x: SCALE * settings.viz_scale,
+                    y: SCALE * settings.viz_scale,
+                    z: SCALE * settings.viz_scale,
                 }),
                 GlobalTransform::default(), // This is required for the Transform system
                 Visibility::default(),      // To control rendering visibility
