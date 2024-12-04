@@ -47,6 +47,7 @@ struct VisualizationSettings{
     component_limit: (f32,f32,f32),
     gamma: (f32,f32,f32),
     hcl_adjust: (u8,u8,u8),
+    is_chroma_luma: bool,
     color_model: ColorType,
     is_instance_visualization: bool,
     mesh_shape: MeshShape,
@@ -62,7 +63,8 @@ impl Default for VisualizationSettings{
             instance_scale: 0.1,
             component_limit: (1., 1., 1.), 
             gamma: (2.2, 2.2, 2.2), 
-            hcl_adjust: (24,8,8),
+            hcl_adjust: (12,8,8),
+            is_chroma_luma: false,
             color_model: ColorType::SphericalHCLA,
             is_instance_visualization: true,
             mesh_shape: MeshShape::Sphere,
@@ -268,13 +270,31 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
         ui.add(egui::Slider::new( &mut settings.gamma.0 ,0.1..=3.0).text("Red"));
         ui.add(egui::Slider::new( &mut settings.gamma.1 ,0.1..=3.0).text("Green"));
         ui.add(egui::Slider::new( &mut settings.gamma.2 ,0.1..=3.0).text("Blue"));
-        ui.label("HCL");
-        ui.add(egui::Slider::new( &mut settings.hcl_adjust.0 ,1..=48).text("Hue"));
-        ui.add(egui::Slider::new( &mut settings.hcl_adjust.1 ,1..=24).text("Chroma"));
-        ui.add(egui::Slider::new( &mut settings.hcl_adjust.2 ,1..=24).text("Luma"));
+
         ui.separator();
 
-        ui.label("Color Space");
+        ui.label("Color Type");
+        ui.horizontal(|ui| {
+            ui.radio_value(&mut settings.is_chroma_luma, true, "HCL");
+            ui.radio_value(&mut settings.is_chroma_luma, false, "HWB");
+        });
+
+        if settings.is_chroma_luma {
+            ui.label("HCL");
+            ui.add(egui::Slider::new( &mut settings.hcl_adjust.0 ,1..=48).text("Hue"));
+            ui.add(egui::Slider::new( &mut settings.hcl_adjust.1 ,1..=24).text("Chroma"));
+            ui.add(egui::Slider::new( &mut settings.hcl_adjust.2 ,1..=24).text("Luma"));
+        }
+        else {
+            ui.label("HWB");
+            ui.add(egui::Slider::new( &mut settings.hcl_adjust.0 ,1..=48).text("Hue"));
+            ui.add(egui::Slider::new( &mut settings.hcl_adjust.1 ,1..=24).text("White"));
+            ui.add(egui::Slider::new( &mut settings.hcl_adjust.2 ,1..=24).text("Black"));
+        }
+
+        ui.separator();
+
+        ui.label("Color Model");
         ui.horizontal(|ui| {
             ui.radio_value(&mut settings.color_model, ColorType::SphericalHCLA, "Spherical");
             ui.radio_value(&mut settings.color_model, ColorType::CubicHSVA, "Cubic");
@@ -419,19 +439,20 @@ fn generate_point_colors(settings: &VisualizationSettings) -> Vec<P_Color> {
     let (h_steps,c_steps,l_steps) = settings.hcl_adjust;
     let color_model: ColorType = settings.color_model;
     
-    let (h_steps,c_steps,l_steps) = (1. / h_steps as f32, 1. / c_steps as f32, 1. / l_steps as f32 );
+    let (h_step,c_step,l_step) = (1. / h_steps as f32, 1. / c_steps as f32, 1. / l_steps as f32 );
     let mut points = Vec::new();
     let one: f32 = 1.;
+    let hwb_offset = if settings.is_chroma_luma { 0} else { 1};
 
-    for h in (0..).map(|x| x as f32 * h_steps).take_while(|&h| h + h_steps <= 1.0) {
-        for c in (0..).map(|y| y as f32 * c_steps).take_while(|&c| c + c_steps <= 1.0) {
-            for l in (0..).map(|z| z as f32 * l_steps).take_while(|&l| l + l_steps <= 1.0) {
+    for h in 0..h_steps {
+        for c in (0 + hwb_offset)..(c_steps + hwb_offset) {
+            for l in (0 + hwb_offset)..(l_steps + hwb_offset) {
                 // Generate the four points of the quad
                 let point: P_Color = 
                     (
-                        h,
-                        c,
-                        l,
+                        h as f32 * h_step,
+                        c as f32 * c_step,
+                        l as f32 * l_step,
                         one,
                     )
                     .into_color(color_model);
@@ -450,20 +471,22 @@ fn generate_quads(settings: &VisualizationSettings) -> Vec<ColorQuad> {
     let method: SlicingMethod = settings.quad_shape;
     let color_model: ColorType = settings.color_model;
     
-    let (h_steps,c_steps,l_steps) = (1. / h_steps as f32, 1. / c_steps as f32, 1. / l_steps as f32 );
-    let offsets = method.get_offsets(); // Get the offsets for this slicing method
+    let (h_step,c_step,l_step) = (1. / h_steps as f32, 1. / c_steps as f32, 1. / l_steps as f32 );
+    let quad_offsets = method.get_offsets(); // Get the offsets for this slicing method
     let mut quads = Vec::new();
     let one: f32 = 1.;
+    let hwb_offset = if settings.is_chroma_luma {0} else {1};
+    let quad_direction = if settings.is_chroma_luma {1.} else {-1.};
 
-    for h in (0..).map(|x| x as f32 * h_steps).take_while(|&h| h + h_steps <= 1.0) {
-        for c in (0..).map(|y| y as f32 * c_steps).take_while(|&c| c + c_steps <= 1.0) {
-            for l in (0..).map(|z| z as f32 * l_steps).take_while(|&l| l + l_steps <= 1.0) {
+    for h in (0 + hwb_offset)..(h_steps+hwb_offset) {
+        for c in (0 + hwb_offset)..(c_steps + hwb_offset) {
+            for l in (0 + hwb_offset * 2)..(l_steps + hwb_offset) {
                 // Generate the four points of the quad
                 let points: [P_Color; 4] = std::array::from_fn(|n| {
                     (
-                        h + offsets[n][0] * h_steps,
-                        c + offsets[n][1] * c_steps,
-                        l + offsets[n][2] * l_steps,
+                        (h as f32 + quad_offsets[n][0] * quad_direction) * h_step,
+                        (c as f32 + quad_offsets[n][1] * quad_direction) * c_step,
+                        (l as f32 + quad_offsets[n][2] * quad_direction)* l_step,
                         one,
                     )
                     .into_color(color_model)
