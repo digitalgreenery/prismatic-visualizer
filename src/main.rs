@@ -478,13 +478,13 @@ fn generate_quads(settings: &VisualizationSettings) -> Vec<ColorQuad> {
     let hwb_offset = if settings.is_chroma_luma {0} else {1};
     let quad_direction = if settings.is_chroma_luma {1.} else {-1.};
 
-    for h in (0 + hwb_offset)..(h_steps+hwb_offset) {
+    for h in 0..h_steps {
         for c in (0 + hwb_offset)..(c_steps + hwb_offset) {
             for l in (0 + hwb_offset * 2)..(l_steps + hwb_offset) {
                 // Generate the four points of the quad
                 let points: [P_Color; 4] = std::array::from_fn(|n| {
                     (
-                        (h as f32 + quad_offsets[n][0] * quad_direction) * h_step,
+                        (h as f32 + quad_offsets[n][0]) * h_step,
                         (c as f32 + quad_offsets[n][1] * quad_direction) * c_step,
                         (l as f32 + quad_offsets[n][2] * quad_direction)* l_step,
                         one,
