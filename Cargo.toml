@@ -1,10 +1,8 @@
 [package]
 name = "prismatic_visualizer"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Digital Greenery"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bevy = "0.15.0"
