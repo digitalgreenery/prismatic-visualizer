@@ -29,13 +29,14 @@ fn main() {
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(EguiPlugin)
         .add_systems(Startup, setup)
-        .add_systems(Update, (camera_controls,ui_overlay,update_visualization))
+        .add_systems(Update, (ui_overlay,update_visualization))
+        .add_systems(FixedUpdate, camera_controls)
         .run();
 }
 
 // A marker component for our components so we can query them separately from the ground plane
 #[derive(Component)]
-struct SphericalVisualizationMeshes;
+struct VisualizationMeshes;
 
 #[derive(Resource, Clone)]
 struct VisualizationSettings{
@@ -431,15 +432,15 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
 
         ui.separator();
 
-        ui.label("Additional Settings");
+        // ui.label("Additional Settings");
 
-        ui.checkbox(&mut settings.gamma_deform, "Gamma Deform");
+        // ui.checkbox(&mut settings.gamma_deform, "Gamma Deform");
 
-        ui.separator();
+        // ui.separator();
 
         ui.label("WASD - Horizontal Movement");
         ui.label("Ctrl & Space - Vertical Movement");
-        ui.label("Arrow Keys - Camera");
+        ui.label("Arrow Keys - Camera Rotation");
 
     });
 
@@ -465,7 +466,7 @@ fn update_visualization(
     visualization_settings: ResMut<VisualizationSettings>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
-    entities: Query<Entity, With<SphericalVisualizationMeshes>>)
+    entities: Query<Entity, With<VisualizationMeshes>>)
 {
 
 
@@ -490,24 +491,21 @@ fn spawn_spherical_visualization(
 
     if settings.is_instance_visualization {
         let mesh = settings.mesh_shape.get_shape(settings.instance_scale);
-        for color in generate_point_colors(&settings) {
-            let (point, color) = get_point_and_color(color, settings);
-            commands.spawn((
+        let entities: Vec<(Mesh3d, MeshMaterial3d<StandardMaterial>, Transform, VisualizationMeshes)> = generate_point_colors(&settings).iter().map(|color|{
+            let (point, color) = get_point_and_color(color.clone(), settings);
+            (
                 Mesh3d(meshes.add(mesh.clone())),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     base_color: color.to_bevy_color(),
                     unlit: true,
-                    cull_mode: None,
                     emissive: color.to_bevy_color().to_linear(),
                     ..Default::default()
                 })),
                 Transform::from_translation(point.map(|axis| axis * SCALE * settings.viz_scale)),
-                GlobalTransform::default(),
-                Visibility::default(),      // To control rendering visibility
-                InheritedVisibility::default(), // For frustum culling
-                SphericalVisualizationMeshes,
-            ));
-        };
+                VisualizationMeshes,
+            )
+        }).collect();
+        commands.spawn_batch(entities);
         
     } else {
         let quad_meshes: Vec<Mesh> = generate_quads(&settings).iter().map(|color_quad| create_quad(color_quad.clone(), settings)).collect();
@@ -516,10 +514,8 @@ fn spawn_spherical_visualization(
             commands.spawn((
                 Mesh3d(meshes.add(mesh.clone())),
                 MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::WHITE,
                     unlit: true,
                     cull_mode: None,
-                    emissive: Color::WHITE.to_linear(),
                     ..Default::default()
                 })),
                 Transform::from_scale(Vec3 {
@@ -530,13 +526,15 @@ fn spawn_spherical_visualization(
                 GlobalTransform::default(), // This is required for the Transform system
                 Visibility::default(),      // To control rendering visibility
                 InheritedVisibility::default(), // For frustum culling
-                SphericalVisualizationMeshes,
+                VisualizationMeshes,
             ));
         }
         
     }
 
 }
+
+
 
 fn generate_point_colors(settings: &VisualizationSettings) -> Vec<P_Color> {
     let (h_steps,c_steps,l_steps) = settings.hcl_adjust;
