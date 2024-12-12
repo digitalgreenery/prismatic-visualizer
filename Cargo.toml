@@ -4,6 +4,9 @@ version = "0.2.1"
 edition = "2021"
 authors = ["Digital Greenery"]
 
+[build]
+rustflags = ["--cfg=web_sys_unstable_apis"]
+
 [dependencies]
 bevy = "0.15.0"
 egui = "0.29.1"

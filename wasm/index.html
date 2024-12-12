@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Prismatic Visualizer</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;   /* Center content vertically in the browser window */
+            justify-content: center; /* Center content horizontally in the browser window */
+            background: linear-gradient(135deg, white 0%, white 49%, black 49%, black 51%, white 51%, white 100%) repeat;
+            background-size: 20px 20px;
+        }
+        canvas {
+            background-color: white; /* Ensuring the canvas has a white background */
+        }
+    </style>
+</head>
+<body>
+    <script type="module">
+        import init from './prismatic_visualizer.js';
+        init();
+    </script>
+</body>
+</html>
