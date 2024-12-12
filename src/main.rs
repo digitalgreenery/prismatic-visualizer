@@ -443,21 +443,6 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
         ui.label("Arrow Keys - Camera Rotation");
 
     });
-
-    // egui::Window::new("Colorspace Info").resizable(false).anchor(egui::Align2::RIGHT_TOP, [5.,-5.]).show(contexts.ctx_mut(), |ui|{
-       
-    //     ui.collapsing("Quaternary Peaks", |ui| {
-    //     //    ui.painter().rect_filled(egui::Rect::from_two_pos(egui::Pos2::ZERO, egui::Pos2::new(200., 200.)), egui::Rounding::ZERO, egui::Color32::from_rgb(255,0,0));
-    //         ui.painter().circle(
-    //             egui::Pos2{x:250.0,y:250.0},
-    //             50.0, 
-    //             egui::Color32::from_rgb(255,0,0), 
-    //             egui::Stroke{width: 5.0, color: egui::Color32::from_rgb(255,0,0)}
-    //         );
-        
-    //     });
-
-    // });
    
 }
 
