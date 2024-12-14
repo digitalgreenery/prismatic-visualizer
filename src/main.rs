@@ -96,7 +96,7 @@ enum RotationDirection {
 enum ColorModelCategory {
     Spherical,           // Hold hue constant, vary chroma and lightness
     Cubic,            // Hold chroma constant, vary hue and lightness
-    Luma2DHue, // Hold lightness constant, vary hue and chroma
+    LumaChroma, // Hold lightness constant, vary hue and chroma
 }
 
 #[derive(Debug, Clone)]
@@ -323,19 +323,20 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
         ui.horizontal(|ui| {
             ui.radio_value(&mut settings.color_model_category, ColorModelCategory::Spherical, "Spherical");
             ui.radio_value(&mut settings.color_model_category, ColorModelCategory::Cubic, "Cubic");
+            ui.radio_value(&mut settings.color_model_category, ColorModelCategory::LumaChroma, "Luma-Chroma");
         });
 
         ui.separator();
 
         match settings.color_model_category {
             ColorModelCategory::Spherical => {
-                ui.radio_value(&mut settings.color_model, ColorModel::SphericalHCLA, "HSL");
+                ui.radio_value(&mut settings.color_model, ColorModel::SphericalHCLA, "HCL");
             },
             ColorModelCategory::Cubic => {
                 ui.radio_value(&mut settings.color_model, ColorModel::CubicHSVA, "HSV");
                 ui.radio_value(&mut settings.color_model, ColorModel::CubicHSLA, "HSL");
             },
-            ColorModelCategory::Luma2DHue => {
+            ColorModelCategory::LumaChroma => {
                 ui.radio_value(&mut settings.color_model, ColorModel::YUVA, "YUV");
             },
         }
@@ -353,6 +354,7 @@ fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSett
             ui.selectable_value(&mut settings.color_space_model, ColorModel::CMYA, "CMY");
             ui.selectable_value(&mut settings.color_space_model, ColorModel::SphericalHCLA, "Spherical HCL");
             ui.selectable_value(&mut settings.color_space_model, ColorModel::CubicHSVA, "Cubic HSV");
+            ui.selectable_value(&mut settings.color_space_model, ColorModel::YUVA, "YUV");
         });
 
         ui.horizontal(|ui| {
