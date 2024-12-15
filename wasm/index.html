@@ -9,20 +9,30 @@
             margin: 0;
             padding: 0;
             display: flex;
-            align-items: center;   /* Center content vertically in the browser window */
+            align-items: center; /* Center content vertically in the browser window */
             justify-content: center; /* Center content horizontally in the browser window */
-            background: linear-gradient(135deg, white 0%, white 49%, black 49%, black 51%, white 51%, white 100%) repeat;
+            background: linear-gradient(135deg, rgb(43, 41, 41) 0%, rgb(43, 41, 41) 49%, black 49%, black 51%, rgb(43, 41, 41) 51%, rgb(43, 41, 41) 100%) repeat;
             background-size: 20px 20px;
+            overflow: hidden; /* Hide scrollbars */
         }
         canvas {
-            background-color: white; /* Ensuring the canvas has a white background */
+            width: 100%; /* Full width of its container */
+            height: auto; /* Maintain aspect ratio */
+            max-height: 100%; /* Limit height to viewport */
+            background-color: rgb(43, 41, 41); 
         }
     </style>
 </head>
 <body>
     <script type="module">
         import init from './prismatic_visualizer.js';
-        init();
+        async function setup() {
+            const module = await init();
+            const canvas = document.querySelector('canvas');
+            canvas.style.width = '100vw';
+            canvas.style.height = '100vh';
+        }
+        setup();
     </script>
 </body>
 </html>
