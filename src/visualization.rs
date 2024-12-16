@@ -150,25 +150,26 @@ pub fn spawn_spherical_visualization(
 }
 
 
-
+//Need to figure out how to merge points and quads
 fn generate_point_colors(settings: &VisualizationSettings) -> Vec<P_Color> {
-    let (h_steps,c_steps,l_steps) = settings.hcl_adjust;
+    let (a_steps,b_steps,c_steps) = settings.hcl_adjust;
     let color_model: ColorModel = settings.color_model;
+    let yuv_offset = if settings.color_model.is_luma_chroma() {-0.5} else {0.};
     
-    let (h_step,c_step,l_step) = (1. / h_steps as f32, 1. / c_steps as f32, 1. / l_steps as f32 );
+    let (a_step,b_step,c_step) = (1. / a_steps as f32, 1. / b_steps as f32, 1. / c_steps as f32 );
     let mut points = Vec::new();
     let one: f32 = 1.;
     let hwb_offset = if settings.is_chroma_luma { 0} else { 1};
 
-    for h in 0..h_steps {
-        for c in (0 + hwb_offset)..(c_steps + hwb_offset) {
-            for l in (0 + hwb_offset)..(l_steps + hwb_offset) {
+    for a in 0..a_steps {
+        for b in (0 + hwb_offset)..(b_steps + hwb_offset) {
+            for c in (0 + hwb_offset)..(c_steps + hwb_offset) {
                 // Generate the four points of the quad
                 let point: P_Color = 
                     (
-                        h as f32 * h_step,
-                        c as f32 * c_step,
-                        l as f32 * l_step,
+                        a as f32 * a_step,
+                        b as f32 * b_step + yuv_offset,
+                        c as f32 * c_step + yuv_offset,
                         one,
                     )
                     .into_color(color_model); 
@@ -183,26 +184,27 @@ fn generate_point_colors(settings: &VisualizationSettings) -> Vec<P_Color> {
 }
 
 fn generate_quads(settings: &VisualizationSettings) -> Vec<ColorQuad> {
-    let (h_steps,c_steps,l_steps) = settings.hcl_adjust;
+    let (a_steps,b_steps,c_steps) = settings.hcl_adjust;
     let method: SlicingMethod = settings.quad_shape;
     let color_model: ColorModel = settings.color_model;
     
-    let (h_step,c_step,l_step) = (1. / h_steps as f32, 1. / c_steps as f32, 1. / l_steps as f32 );
+    let (a_step,b_step,c_step) = (1. / a_steps as f32, 1. / b_steps as f32, 1. / c_steps as f32 );
     let quad_offsets = method.get_offsets(); // Get the offsets for this slicing method
     let mut quads = Vec::new();
     let one: f32 = 1.;
     let hwb_offset = if settings.is_chroma_luma {0} else {1};
     let quad_direction = if settings.is_chroma_luma {1.} else {-1.};
+    let yuv_offset = if settings.color_model.is_luma_chroma() {-0.5} else {0.};
 
-    for h in 0..h_steps {
-        for c in (0 + hwb_offset)..(c_steps + hwb_offset) {
-            for l in (0 + hwb_offset * 2)..(l_steps + hwb_offset) {
+    for a in 0..a_steps {
+        for b in (0 + hwb_offset)..(b_steps + hwb_offset) {
+            for c in (0 + hwb_offset * 2)..(c_steps + hwb_offset) {
                 // Generate the four points of the quad
                 let points: [P_Color; 4] = std::array::from_fn(|n| {
                     (
-                        (h as f32 + quad_offsets[n][0]) * h_step,
-                        (c as f32 + quad_offsets[n][1] * quad_direction) * c_step,
-                        (l as f32 + quad_offsets[n][2] * quad_direction)* l_step,
+                        (a as f32 + quad_offsets[n][0]) * a_step,
+                        (b as f32 + quad_offsets[n][1] * quad_direction) * b_step + yuv_offset,
+                        (c as f32 + quad_offsets[n][2] * quad_direction)* c_step + yuv_offset,
                         one,
                     )
                     .into_color(color_model)
