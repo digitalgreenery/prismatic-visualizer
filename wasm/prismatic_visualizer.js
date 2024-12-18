@@ -279,7 +279,7 @@ function __wbg_adapter_73(arg0, arg1) {
 }
 
 function __wbg_adapter_76(arg0, arg1, arg2) {
-    wasm.closure100546_externref_shim(arg0, arg1, arg2);
+    wasm.closure100541_externref_shim(arg0, arg1, arg2);
 }
 
 const __wbindgen_enum_GamepadMappingType = ["", "standard"];
@@ -2233,8 +2233,8 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper131737 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 100547, __wbg_adapter_76);
+    imports.wbg.__wbindgen_closure_wrapper131637 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 100542, __wbg_adapter_76);
         return ret;
     };
     imports.wbg.__wbindgen_closure_wrapper1726 = function(arg0, arg1, arg2) {
@@ -2257,51 +2257,51 @@ function __wbg_get_imports() {
         const ret = makeMutClosure(arg0, arg1, 871, __wbg_adapter_36);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper72716 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper72695 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 55065, __wbg_adapter_73);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7658 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7648 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_47);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7659 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7649 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7660 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7650 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_53);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7661 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7651 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7662 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7652 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7663 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7653 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7664 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7654 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7665 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7655 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7666 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7656 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7667 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7657 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7668 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper7658 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 4531, __wbg_adapter_70);
         return ret;
     };
