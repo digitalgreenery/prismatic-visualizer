@@ -198,7 +198,7 @@ fn generate_quads(settings: &VisualizationSettings) -> Vec<ColorQuad> {
 
     for a in 0..a_steps {
         for b in (0 + hwb_offset)..(b_steps + hwb_offset) {
-            for c in (0 + hwb_offset * 2)..(c_steps + hwb_offset) {
+            for c in (0 + hwb_offset)..(c_steps + hwb_offset) {
                 // Generate the four points of the quad
                 let points: [P_Color; 4] = std::array::from_fn(|n| {
                     (
