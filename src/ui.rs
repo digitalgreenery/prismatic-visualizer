@@ -1,6 +1,6 @@
 use bevy::prelude::{ResMut, Resource};
 use prismatic_color::{ColorModel, ColorSpace};
-use bevy_egui::EguiContexts;
+use bevy_egui::{egui, EguiContexts};
 
 use crate::visualization::{ColorModelCategory, MeshShape, RotationDirection, SlicingMethod};
 
@@ -12,6 +12,7 @@ pub struct VisualizationSettings{
     pub per_component_gamma: bool,
     pub gamma: (f32,f32,f32),
     pub hcl_adjust: (u8,u8,u8),
+    // pub offset: ((u8,u8),(u8,u8),(u8,u8)),
     pub is_chroma_luma: bool,
     pub color_model_category: ColorModelCategory,
     pub color_model: ColorModel,

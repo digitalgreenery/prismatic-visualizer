@@ -1,12 +1,11 @@
 [package]
 name = "prismatic_visualizer"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 authors = ["Digital Greenery"]
 
 [dependencies]
 bevy = "0.15.0"
-egui = "0.29.1"
 bevy_egui = "0.31.1"
 prismatic_color = { git = "https://github.com/digitalgreenery/prismatic-color.git" }
 wasm-bindgen = "0.2.97"
