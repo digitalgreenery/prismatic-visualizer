@@ -11,7 +11,7 @@ mod ui;
 use ui::{ui_overlay, VisualizationSettings};
 
 mod visualization;
-use visualization::{spawn_spherical_visualization, VisualizationMeshes, SCALE};
+use visualization::{spawn_3d_visualization, VisualizationMeshes, SCALE};
 
 
 fn main() {
@@ -43,7 +43,7 @@ fn setup(
 
     commands.insert_resource(settings);
 
-    spawn_spherical_visualization(commands, meshes, materials, &settings_copy);
+    spawn_3d_visualization(commands, meshes, materials, &settings_copy);
 
  
 }
@@ -64,7 +64,7 @@ fn update_visualization(
             commands.entity(mesh).despawn();
         }
  
-    spawn_spherical_visualization(commands, meshes, materials, & *visualization_settings);
+    spawn_3d_visualization(commands, meshes, materials, & *visualization_settings);
  
     }
 }

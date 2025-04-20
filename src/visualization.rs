@@ -83,6 +83,14 @@ impl MeshShape {
     }
 }
 
+#[derive(Clone,PartialEq)]
+pub enum Dimensionality {
+    Vertex,
+    Edge,
+    Face,
+    Volume,
+}
+
 // const X_EXTENT: f32 = 14.5;
 pub const SCALE: f32 = 5.0;
 
@@ -97,56 +105,58 @@ impl BevyColorConvert for P_Color {
     }
 }
 
-pub fn spawn_spherical_visualization(
+pub fn spawn_3d_visualization(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     settings: &VisualizationSettings)
 {
-
-    if settings.is_instance_visualization {
-        let mesh = settings.mesh_shape.get_shape(settings.instance_scale);
-        let entities: Vec<(Mesh3d, MeshMaterial3d<StandardMaterial>, Transform, VisualizationMeshes)> = generate_point_colors(&settings).iter().map(|color|{
-            let (point, color) = get_point_and_color(color.clone(), settings);
-            (
-                Mesh3d(meshes.add(mesh.clone())),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: color.to_bevy_color(),
-                    unlit: true,
-                    emissive: color.to_bevy_color().to_linear(),
-                    ..Default::default()
-                })),
-                Transform::from_translation(point.map(|axis| axis * SCALE * settings.viz_scale)),
-                VisualizationMeshes,
-            )
-        }).collect();
-        commands.spawn_batch(entities);
-        
-    } else {
-        let quad_meshes: Vec<Mesh> = generate_quads(&settings).iter().map(|color_quad| create_quad(color_quad.clone(), settings)).collect();
-
-        for mesh in quad_meshes {
-            commands.spawn((
-                Mesh3d(meshes.add(mesh.clone())),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    unlit: true,
-                    cull_mode: None,
-                    ..Default::default()
-                })),
-                Transform::from_scale(Vec3 {
-                    x: SCALE * settings.viz_scale,
-                    y: SCALE * settings.viz_scale,
-                    z: SCALE * settings.viz_scale,
-                }),
-                GlobalTransform::default(), // This is required for the Transform system
-                Visibility::default(),      // To control rendering visibility
-                InheritedVisibility::default(), // For frustum culling
-                VisualizationMeshes,
-            ));
-        }
-        
+    match settings.dimensionality {
+        Dimensionality::Vertex => {
+                let mesh = settings.mesh_shape.get_shape(settings.instance_scale);
+                let entities: Vec<(Mesh3d, MeshMaterial3d<StandardMaterial>, Transform, VisualizationMeshes)> = generate_point_colors(&settings).iter().map(|color|{
+                    let (point, color) = get_point_and_color(color.clone(), settings);
+                    (
+                        Mesh3d(meshes.add(mesh.clone())),
+                        MeshMaterial3d(materials.add(StandardMaterial {
+                            base_color: color.to_bevy_color(),
+                            unlit: true,
+                            emissive: color.to_bevy_color().to_linear(),
+                            ..Default::default()
+                        })),
+                        Transform::from_translation(point.map(|axis| axis * SCALE * settings.viz_scale)),
+                        VisualizationMeshes,
+                    )
+                }).collect();
+                commands.spawn_batch(entities);   
+            },
+        Dimensionality::Edge => todo!(),
+        Dimensionality::Face => {
+            let quad_meshes: Vec<Mesh> = generate_quads(&settings).iter().map(|color_quad| create_quad(color_quad.clone(), settings)).collect();
+    
+            for mesh in quad_meshes {
+                commands.spawn((
+                    Mesh3d(meshes.add(mesh.clone())),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        unlit: true,
+                        cull_mode: None,
+                        ..Default::default()
+                    })),
+                    Transform::from_scale(Vec3 {
+                        x: SCALE * settings.viz_scale,
+                        y: SCALE * settings.viz_scale,
+                        z: SCALE * settings.viz_scale,
+                    }),
+                    GlobalTransform::default(), // This is required for the Transform system
+                    Visibility::default(),      // To control rendering visibility
+                    InheritedVisibility::default(), // For frustum culling
+                    VisualizationMeshes,
+                ));
+            }
+            
+        },
+        Dimensionality::Volume => todo!(),
     }
-
 }
 
 
