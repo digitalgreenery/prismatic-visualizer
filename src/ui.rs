@@ -1,8 +1,8 @@
 use bevy::prelude::{ResMut, Resource};
 use prismatic_color::{ColorModel, ColorSpace};
-use bevy_egui::{egui, EguiContexts};
+use bevy_egui::{egui::{self, epaint::Vertex}, EguiContexts};
 
-use crate::visualization::{ColorModelCategory, MeshShape, RotationDirection, SlicingMethod};
+use crate::visualization::{ColorModelCategory, Dimensionality, MeshShape, RotationDirection, SlicingMethod};
 
 #[derive(Resource, Clone)]
 pub struct VisualizationSettings{
@@ -17,7 +17,7 @@ pub struct VisualizationSettings{
     pub color_model_category: ColorModelCategory,
     pub color_model: ColorModel,
     pub color_space: ColorSpace,
-    pub is_instance_visualization: bool,
+    pub dimensionality: Dimensionality,
     pub mesh_shape: MeshShape,
     pub quad_shape: SlicingMethod,
     pub gamma_deform: bool,
@@ -39,7 +39,7 @@ impl Default for VisualizationSettings{
             is_chroma_luma: false,
             color_model_category: ColorModelCategory::Spherical,
             color_model: ColorModel::SphericalHCLA,
-            is_instance_visualization: true,
+            dimensionality: Dimensionality::Vertex,
             mesh_shape: MeshShape::Sphere,
             quad_shape: SlicingMethod::Axial,
             gamma_deform: false,
@@ -55,9 +55,9 @@ impl Default for VisualizationSettings{
 pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSettings>){
 
     //Create window for variable sliders
-    egui::Window::new("Spherical RGB Adjust").resizable(false).anchor(egui::Align2::LEFT_TOP, [5.,5.]).show(contexts.ctx_mut(), |ui|{
+    egui::SidePanel::left("Spherical RGB Adjust").resizable(false).show(contexts.ctx_mut(), |ui|{
         
-        ui.set_max_width(ui.available_width()/2.);
+        // ui.set_max_width(ui.available_width()/2.);
 
         ui.label("Scale");
         ui.add(egui::Slider::new( &mut settings.viz_scale ,0.0..=2.0).text("Visualization Scale"));
@@ -194,26 +194,31 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
 
         ui.label("Shape");
         ui.horizontal(|ui| {
-            ui.radio_value(&mut settings.is_instance_visualization, true, "Shapes");
-            ui.radio_value(&mut settings.is_instance_visualization, false, "Slices");
+            ui.radio_value(&mut settings.dimensionality, Dimensionality::Vertex, "Vertex");
+            ui.radio_value(&mut settings.dimensionality, Dimensionality::Face, "Faces");
         });
   
-        if settings.is_instance_visualization {
-            ui.label("Mesh Shape");
-            ui.horizontal(|ui| {
-                ui.radio_value(&mut settings.mesh_shape, MeshShape::Sphere, "Spheres");
-                ui.radio_value(&mut settings.mesh_shape, MeshShape::Cube, "Cubes");
-                ui.add(egui::Slider::new( &mut settings.instance_scale ,0.0..=2.0).text("Shape Scale"));
-            });
-        }
-        else {
-            ui.label("Quad Direction");
-            ui.horizontal(|ui| {
-                ui.radio_value(&mut settings.quad_shape, SlicingMethod::Axial, "Axial");
-                ui.radio_value(&mut settings.quad_shape, SlicingMethod::Radial, "Radial");
-                ui.radio_value(&mut settings.quad_shape, SlicingMethod::Concentric, "Concentric");
-                ui.checkbox(&mut settings.discrete_color, "Discrete Color");
-            });
+        match settings.dimensionality {
+            Dimensionality::Vertex => {
+                ui.label("Mesh Shape");
+                ui.horizontal(|ui| {
+                    ui.radio_value(&mut settings.mesh_shape, MeshShape::Sphere, "Spheres");
+                    ui.radio_value(&mut settings.mesh_shape, MeshShape::Cube, "Cubes");
+                    ui.add(egui::Slider::new( &mut settings.instance_scale ,0.0..=2.0).text("Shape Scale"));
+                });
+            },
+            Dimensionality::Edge => {},
+            Dimensionality::Face => {
+                ui.label("Quad Direction");
+                ui.horizontal(|ui| {
+                    ui.radio_value(&mut settings.quad_shape, SlicingMethod::Axial, "Axial");
+                    ui.radio_value(&mut settings.quad_shape, SlicingMethod::Radial, "Radial");
+                    ui.radio_value(&mut settings.quad_shape, SlicingMethod::Concentric, "Concentric");
+                    ui.checkbox(&mut settings.discrete_color, "Discrete Color");
+                });
+
+            },
+            Dimensionality::Volume => {},
         }
 
         ui.separator();
