@@ -276,7 +276,83 @@ impl DimensionList {
                 ));
             },
             DimensionList::Volume(face_list) => {
+                //Render faces with a triangle based mesh
+                // Collect positions, normals, and colors
+                let mut positions: Vec<[f32; 3]> = Vec::new();
+                let mut normals: Vec<[f32; 3]> = Vec::new();
+                let mut colors: Vec<[f32; 4]> = Vec::new();
+                let mut indices: Vec<u32> = Vec::new();
 
+                for (i1, i2, i3, i4) in &face_list.faces {
+                    // Lookup vertices from registry
+                    let v1 = face_list.vertex_registry.get_index(*i1).unwrap().0;
+                    let v2 = face_list.vertex_registry.get_index(*i2).unwrap().0;
+                    let v3 = face_list.vertex_registry.get_index(*i3).unwrap().0;
+                    let v4 = face_list.vertex_registry.get_index(*i4).unwrap().0;
+
+                    let verts = [v1, v2, v3, v4];
+
+                    // Push positions/colors
+
+                    
+                    let base = positions.len() as u32;
+                    for v in &verts {
+                        positions.push(v.point.map(|p| p.into_inner() * SCALE * settings.viz_scale));
+                        let color = 
+                            if settings.discrete_color {
+                                P_Color::from_array(v1.color.map(|x| x.into_inner()), settings.color_model)
+                                .to_bevy_color()
+                                .to_linear()
+                                .to_f32_array()
+                            }
+                            else {
+                                P_Color::from_array(v.color.map(|x| x.into_inner()), settings.color_model)
+                                .to_bevy_color()
+                                .to_linear()
+                                .to_f32_array()
+                        };
+                        colors.push(color);
+                    }
+
+                    // Compute a simple normal (cross product of two edges)
+                    let p1 = Vec3::from(positions[base as usize]);
+                    let p2 = Vec3::from(positions[base as usize + 1]);
+                    let p3 = Vec3::from(positions[base as usize + 2]);
+                    let normal = (p2 - p1).cross(p3 - p1).normalize_or_zero();
+                    for _ in 0..4 {
+                        normals.push(normal.into());
+                    }
+
+                    // Add indices for two triangles: (0,1,2) and (0,2,3)
+                    indices.extend_from_slice(&[
+                        base, base + 1, base + 2,
+                        base, base + 2, base + 3,
+                    ]);
+                }
+
+                // Build mesh
+                let mut mesh = Mesh::new(
+                    bevy::render::mesh::PrimitiveTopology::TriangleList,
+                    RenderAssetUsages::default(), // or RenderAssetUsages::RENDER_WORLD if you only need rendering
+                );
+                mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+                mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+                mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+                mesh.insert_indices(bevy::render::mesh::Indices::U32(indices));
+
+                // Unlit so vertex colors are shown directly
+                let material = materials.add(StandardMaterial {
+                    base_color: Color::WHITE,
+                    unlit: true,
+                    ..default()
+                });
+
+                commands.spawn((
+                     
+                    Mesh3d( meshes.add(mesh)),
+                    MeshMaterial3d(material),
+                    VisualizationMesh,
+                ));
             },
         }
     }
@@ -562,21 +638,48 @@ fn generate_dimension_lists(settings: &VisualizationSettings) ->  DimensionList{
                             face_list.add_quad(point_1, point_2, point_3, point_4);
                         },
                         DimensionList::Volume(face_list) => {
-                            // let (a_start, b_start,c_start) = (index_of_a == 0, index_of_b == 0,index_of_c == 0);
-                            // let (a_end, b_end,c_end) = (index_of_a == channel_a_list.len() - 1, index_of_b == channel_b_list.len() - 1,index_of_c == channel_c_list.len() - 1);
-                            // if a_start || a_end {
-                            //     face_list.add_quad(v1, v2, v3, v4);
-                            // }
-                            // else if b_start || b_end {
+                            // Check each axis separately
+                            // X-min and X-max
+                            if index_of_a == 0 || index_of_a == channel_a_list.len() - 1 {
+                                let slice = SlicingMethod::X;
+                                let offsets = slice.get_face_offsets();
+                                let mut verts = Vec::new();
+                                for o in &offsets {
+                                    let ca = channel_a_list.get(wrap_index(index_of_a, o[0], channel_a_list.len())).unwrap().value;
+                                    let cb = channel_b_list.get(wrap_index(index_of_b, o[1], channel_b_list.len())).unwrap().value + yuv_offset;
+                                    let cc = channel_c_list.get(wrap_index(index_of_c, o[2], channel_c_list.len())).unwrap().value + yuv_offset;
+                                    verts.push(VertexObject::from_tuple(get_point_and_color((ca,cb,cc), settings)));
+                                }
+                                face_list.add_quad(verts[0].clone(), verts[1].clone(), verts[2].clone(), verts[3].clone());
+                            }
 
-                            // }
-                            // else if c_start || c_end {
-                                
-                            // }
-                            // else {
-                            //     continue;
-                            // }
-                            todo!();
+                            // Y-min and Y-max
+                            if index_of_b == 0 || index_of_b == channel_b_list.len() - 1 {
+                                let slice = SlicingMethod::Y;
+                                let offsets = slice.get_face_offsets();
+                                let mut verts = Vec::new();
+                                for o in &offsets {
+                                    let ca = channel_a_list.get(wrap_index(index_of_a, o[0], channel_a_list.len())).unwrap().value;
+                                    let cb = channel_b_list.get(wrap_index(index_of_b, o[1], channel_b_list.len())).unwrap().value + yuv_offset;
+                                    let cc = channel_c_list.get(wrap_index(index_of_c, o[2], channel_c_list.len())).unwrap().value + yuv_offset;
+                                    verts.push(VertexObject::from_tuple(get_point_and_color((ca,cb,cc), settings)));
+                                }
+                                face_list.add_quad(verts[0].clone(), verts[1].clone(), verts[2].clone(), verts[3].clone());
+                            }
+
+                            // Z-min and Z-max
+                            if index_of_c == 0 || index_of_c == channel_c_list.len() - 1 {
+                                let slice = SlicingMethod::Z;
+                                let offsets = slice.get_face_offsets();
+                                let mut verts = Vec::new();
+                                for o in &offsets {
+                                    let ca = channel_a_list.get(wrap_index(index_of_a, o[0], channel_a_list.len())).unwrap().value;
+                                    let cb = channel_b_list.get(wrap_index(index_of_b, o[1], channel_b_list.len())).unwrap().value + yuv_offset;
+                                    let cc = channel_c_list.get(wrap_index(index_of_c, o[2], channel_c_list.len())).unwrap().value + yuv_offset;
+                                    verts.push(VertexObject::from_tuple(get_point_and_color((ca,cb,cc), settings)));
+                                }
+                                face_list.add_quad(verts[0].clone(), verts[1].clone(), verts[2].clone(), verts[3].clone());
+                            }
                         },
                     }
                 
