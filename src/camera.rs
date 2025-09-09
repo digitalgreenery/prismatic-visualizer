@@ -11,7 +11,7 @@ pub fn camera_controls(
     time: Res<Time>,
     mut contexts: bevy_egui::EguiContexts,
 ){
-    if !contexts.ctx_mut().is_pointer_over_area() && !contexts.ctx_mut().wants_keyboard_input(){
+    if !contexts.ctx_mut().unwrap().is_pointer_over_area() && !contexts.ctx_mut().unwrap().wants_keyboard_input(){
         for mut camera_transform in &mut camera_query {
 
             let boost = if keyboard.pressed(KeyCode::ShiftLeft) {2.} else {0.};
