@@ -4,6 +4,11 @@ version = "0.3.1"
 edition = "2021"
 authors = ["Digital Greenery"]
 
+[features]
+default = []
+webgl = []
+webgpu = []
+
 [dependencies]
 bevy = "0.16.1"
 bevy_egui = "0.36.0"
@@ -13,4 +18,10 @@ bytemuck = "1.23.2"
 indexmap = "2.11.1"
 
 bevy_pointcloud = { git = "https://github.com/rlamarche/bevy_pointcloud.git", branch = "main" }
-getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3.3", features = ["wasm_js"] }
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"

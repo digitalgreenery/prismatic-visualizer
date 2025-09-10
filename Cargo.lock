@@ -1039,7 +1039,7 @@ dependencies = [
  "bevy_transform",
  "bevy_utils",
  "bytemuck",
- "getrandom 0.3.2",
+ "getrandom 0.3.3",
  "las",
  "nonmax",
  "serde",
@@ -2348,9 +2348,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73fea8450eea4bac3940448fb7ae50d91f034f941199fcd9d909a5a07aa455f0"
+checksum = "26145e563e54f2cadc477553f1ec5ee650b00862f0a58bcd12cbdc5f0ea2d2f4"
 dependencies = [
  "cfg-if",
  "js-sys",
@@ -2910,7 +2910,7 @@ version = "0.1.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38f262f097c174adebe41eb73d66ae9c06b2844fb0da69969647bbddd9b0538a"
 dependencies = [
- "getrandom 0.3.2",
+ "getrandom 0.3.3",
  "libc",
 ]
 
@@ -3888,7 +3888,7 @@ dependencies = [
  "bevy_egui",
  "bevy_pointcloud",
  "bytemuck",
- "getrandom 0.3.2",
+ "getrandom 0.3.3",
  "indexmap",
  "prismatic_color",
  "wasm-bindgen",
@@ -4822,7 +4822,7 @@ version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
 dependencies = [
- "getrandom 0.3.2",
+ "getrandom 0.3.3",
  "js-sys",
  "serde",
  "wasm-bindgen",
