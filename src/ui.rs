@@ -56,17 +56,19 @@ impl Default for ColorChannel {
 }
 
 impl ColorChannel {
-    pub fn generate(&self) -> Vec<ChannelIndex> {
+    pub fn generate(&self, not_vertex: bool) -> Vec<ChannelIndex> {
+
+        let steps = if not_vertex {self.steps + 1} else {self.steps};
         
         let mut values = Vec::new();
 
-        let step_size = self.step_size();
+        let step_size = self.step_size(steps);
 
         let range = 
             match self.step_type {
-                StepType::Forward => 0..self.steps,
-                StepType::Reverse => 1..self.steps+1,
-                StepType::Inclusive => 0..self.steps,
+                StepType::Forward => 0..steps,
+                StepType::Reverse => 1..steps+1,
+                StepType::Inclusive => 0..steps,
             };
 
         for step in range {
@@ -76,7 +78,8 @@ impl ColorChannel {
         }
         values
     }
-    fn step_size(&self) -> f32 {
+
+    fn step_size(&self, steps: usize) -> f32 {
         if self.step_type == StepType::Inclusive {
             (self.end - self.start) / (self.steps as f32 - 1.)
         }
@@ -242,7 +245,7 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
             else {
                 ui.selectable_value(&mut settings.channel_settings.2.step_type, StepType::Inclusive, "Inclusive");
             }
-            // ui.selectable_label(settings.channel_settings.0, text)
+
         });
         ui.horizontal(|ui|{
             ui.add(egui::Slider::new( &mut settings.channel_settings.2.start,0.0..=1.0).drag_value_speed(0.05).prefix("Start: "));
