@@ -17,6 +17,8 @@ use visualization::{spawn_3d_visualization, VisualizationMesh, SCALE};
 use bevy_pointcloud::{render::PointCloudRenderMode, PointCloudPlugin};
 use bevy_pointcloud::point_cloud::{PointCloud, PointCloud3d, PointCloudData};
 
+use crate::ui::{ColorChannel, StepType};
+
 
 fn main() {
     App::new()
@@ -54,7 +56,16 @@ fn setup(
         },
     ));
 
-    let settings = VisualizationSettings::default();
+    let channel_settings: (ColorChannel, ColorChannel, ColorChannel) = (
+        ColorChannel { start: 0., end: 1., steps: 12, step_type: StepType::Forward },
+        ColorChannel { start: 0., end: 1., steps: 8, step_type: StepType::Inclusive },
+        ColorChannel { start: 0., end: 1., steps: 8, step_type: StepType::Inclusive},
+    );
+
+    let settings = VisualizationSettings {
+        channel_settings,
+        ..Default::default()
+    };
 
     let settings_copy = settings.clone();
 

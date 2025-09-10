@@ -265,6 +265,7 @@ impl DimensionList {
                 let material = materials.add(StandardMaterial {
                     base_color: Color::WHITE,
                     unlit: true,
+                    cull_mode: None,
                     ..default()
                 });
 
@@ -344,6 +345,7 @@ impl DimensionList {
                 let material = materials.add(StandardMaterial {
                     base_color: Color::WHITE,
                     unlit: true,
+                    cull_mode: None,
                     ..default()
                 });
 
@@ -560,16 +562,16 @@ fn generate_dimension_lists(settings: &VisualizationSettings) ->  DimensionList{
     };
 
 
-    let channel_a_list = settings.channel_settings.0.generate();
-    let channel_b_list = settings.channel_settings.1.generate();
-    let channel_c_list = settings.channel_settings.2.generate();
+    let channel_a_list = settings.channel_settings.0.generate(settings.dimensionality != Dimensionality::Vertex);
+    let channel_b_list = settings.channel_settings.1.generate(settings.dimensionality != Dimensionality::Vertex);
+    let channel_c_list = settings.channel_settings.2.generate(settings.dimensionality != Dimensionality::Vertex);
 
     for (index_of_a, a) in channel_a_list.iter().enumerate() {
-        if settings.dimensionality != Dimensionality::Vertex && channel_a_list.len() < 1 {continue};
+        if settings.dimensionality != Dimensionality::Vertex && channel_a_list.len() - index_of_a <= 1 {continue};
         for (index_of_b, b ) in channel_b_list.iter().enumerate() {
-            if settings.dimensionality != Dimensionality::Vertex && channel_b_list.len() < 1 {continue};
+            if settings.dimensionality != Dimensionality::Vertex && channel_b_list.len()  - index_of_b <= 1 {continue};
             for (index_of_c, c ) in channel_c_list.iter().enumerate() {
-                if settings.dimensionality != Dimensionality::Vertex && channel_c_list.len() < 1 {continue};
+                if settings.dimensionality != Dimensionality::Vertex && channel_c_list.len()  - index_of_c <= 1 {continue};
                     // Generate points of the dimension
                     let color_point_1 = (
                         a.value,
@@ -640,7 +642,7 @@ fn generate_dimension_lists(settings: &VisualizationSettings) ->  DimensionList{
                         DimensionList::Volume(face_list) => {
                             // Check each axis separately
                             // X-min and X-max
-                            if index_of_a == 0 || index_of_a == channel_a_list.len() - 1 {
+                            if index_of_a == 0 || index_of_a == channel_a_list.len() - 2 {
                                 let slice = SlicingMethod::X;
                                 let offsets = slice.get_face_offsets();
                                 let mut verts = Vec::new();
@@ -654,7 +656,7 @@ fn generate_dimension_lists(settings: &VisualizationSettings) ->  DimensionList{
                             }
 
                             // Y-min and Y-max
-                            if index_of_b == 0 || index_of_b == channel_b_list.len() - 1 {
+                            if index_of_b == 0 || index_of_b == channel_b_list.len() - 2 {
                                 let slice = SlicingMethod::Y;
                                 let offsets = slice.get_face_offsets();
                                 let mut verts = Vec::new();
@@ -668,7 +670,7 @@ fn generate_dimension_lists(settings: &VisualizationSettings) ->  DimensionList{
                             }
 
                             // Z-min and Z-max
-                            if index_of_c == 0 || index_of_c == channel_c_list.len() - 1 {
+                            if index_of_c == 0 || index_of_c == channel_c_list.len() - 2 {
                                 let slice = SlicingMethod::Z;
                                 let offsets = slice.get_face_offsets();
                                 let mut verts = Vec::new();
