@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export RUSTFLAGS=--cfg=web_sys_unstable_apis
+export RUSTFLAGS='--cfg getrandom_backend="wasm_js"'
 cargo clean
 cargo build --release --target wasm32-unknown-unknown || exit 1
 wasm-bindgen --no-typescript --target web \
