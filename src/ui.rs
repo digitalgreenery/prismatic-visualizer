@@ -81,10 +81,10 @@ impl ColorChannel {
 
     fn step_size(&self, steps: usize) -> f32 {
         if self.step_type == StepType::Inclusive {
-            (self.end - self.start) / (self.steps as f32 - 1.)
+            (self.end - self.start) / (steps as f32 - 1.)
         }
         else {
-            (self.end - self.start) / (self.steps as f32)
+            (self.end - self.start) / (steps as f32)
         }
     }
 }
