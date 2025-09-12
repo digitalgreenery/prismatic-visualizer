@@ -17,7 +17,7 @@ wasm-bindgen = "0.2.101"
 bytemuck = "1.23.2"
 indexmap = "2.11.1"
 
-bevy_pointcloud = { git = "https://github.com/rlamarche/bevy_pointcloud.git", branch = "main" }
+bevy_pointcloud = { git = "https://github.com/rlamarche/bevy_pointcloud.git", branch = "main", features = ["webgl"]}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3.3", features = ["wasm_js"] }
