@@ -8,31 +8,93 @@
             height: 100%;
             margin: 0;
             padding: 0;
-            display: flex;
-            align-items: center; /* Center content vertically in the browser window */
-            justify-content: center; /* Center content horizontally in the browser window */
+            overflow: hidden;
             background: linear-gradient(135deg, rgb(43, 41, 41) 0%, rgb(43, 41, 41) 49%, black 49%, black 51%, rgb(43, 41, 41) 51%, rgb(43, 41, 41) 100%) repeat;
             background-size: 20px 20px;
-            overflow: hidden; /* Hide scrollbars */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
         }
+
+        /* Loading overlay */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(43, 41, 41, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            z-index: 9999;
+            text-align: center;
+        }
+
+        /* Corrected 12-step color cycle animation */
+        #loading span {
+            font-weight: bold;
+            display: inline-block;
+            animation: colorcycle 3s linear infinite;
+        }
+
+        @keyframes colorcycle {
+            0%   { color: rgb(255,0,0); }
+            8%   { color: rgb(215,85,0); }
+            17%  { color: rgb(177,177,0); }
+            25%  { color: rgb(85,215,0); }
+            33%  { color: rgb(0,255,0); }
+            42%  { color: rgb(0,215,85); }
+            50%  { color: rgb(0,177,177); }
+            58%  { color: rgb(0,85,215); }
+            67%  { color: rgb(0,0,255); }
+            75%  { color: rgb(85,0,215); }
+            83%  { color: rgb(177,0,177); }
+            92%  { color: rgb(215,0,85); }
+            100% { color: rgb(255,0,0); }
+        }
+
         canvas {
-            width: 100%; /* Full width of its container */
-            height: auto; /* Maintain aspect ratio */
-            max-height: 100%; /* Limit height to viewport */
-            background-color: rgb(43, 41, 41); 
+            width: 100vw;
+            height: 100vh;
+            background-color: rgb(43, 41, 41);
+            display: block;
         }
     </style>
 </head>
 <body>
+    <!-- Loading overlay -->
+    <div id="loading"><span>Loading Prismatic Visualizer…</span></div>
+
+    <!-- Canvas for WASM app -->
+    <canvas></canvas>
+
     <script type="module">
         import init from './prismatic_visualizer.js';
+
         async function setup() {
             const module = await init();
+
+            // Hide loading overlay after WASM initializes
+            const loading = document.getElementById('loading');
+            loading.style.display = 'none';
+
+            // Canvas sizing
             const canvas = document.querySelector('canvas');
-            canvas.style.width = '100vw';
-            canvas.style.height = '100vh';
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
+
         setup();
+
+        // Resize canvas dynamically
+        window.addEventListener('resize', () => {
+            const canvas = document.querySelector('canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
     </script>
 </body>
 </html>
