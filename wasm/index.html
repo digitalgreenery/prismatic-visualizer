@@ -59,12 +59,12 @@
             100% { color: rgb(255,0,0); }
         }
 
-        /* Canvas fills entire viewport */
+        /* Canvas fills viewport */
         canvas {
             display: block;
+            background-color: rgb(43, 41, 41);
             width: 100vw;
             height: 100vh;
-            background-color: rgb(43, 41, 41);
         }
     </style>
 </head>
@@ -81,19 +81,22 @@
         async function setup() {
             const canvas = document.getElementById('prismatic-canvas');
 
-            // Set canvas drawing buffer to match viewport
+            // Resize canvas for high-DPI and mobile
             function resizeCanvas() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = window.innerWidth * dpr;
+                canvas.height = window.innerHeight * dpr;
+                canvas.style.width = window.innerWidth + 'px';
+                canvas.style.height = window.innerHeight + 'px';
             }
+
             resizeCanvas();
 
             // Initialize WASM module, passing canvas if supported
             const module = await init({ canvas });
 
             // Hide loading overlay after WASM initializes
-            const loading = document.getElementById('loading');
-            loading.style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
 
             // Update canvas size on window resize
             window.addEventListener('resize', resizeCanvas);
