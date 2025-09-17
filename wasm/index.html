@@ -73,32 +73,33 @@
     <div id="loading"><span>Loading Prismatic Visualizer…</span></div>
 
     <!-- Canvas for WASM app -->
-    <canvas></canvas>
+    <canvas id="prismatic-canvas"></canvas>
 
     <script type="module">
         import init from './prismatic_visualizer.js';
 
         async function setup() {
-            const module = await init();
+            const canvas = document.getElementById('prismatic-canvas');
+
+            // Set canvas drawing buffer to match viewport
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+
+            // Initialize WASM module, passing canvas if supported
+            const module = await init({ canvas });
 
             // Hide loading overlay after WASM initializes
             const loading = document.getElementById('loading');
             loading.style.display = 'none';
 
-            // Set canvas size
-            const canvas = document.querySelector('canvas');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            // Update canvas size on window resize
+            window.addEventListener('resize', resizeCanvas);
         }
 
         setup();
-
-        // Resize canvas dynamically
-        window.addEventListener('resize', () => {
-            const canvas = document.querySelector('canvas');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
     </script>
 </body>
 </html>
