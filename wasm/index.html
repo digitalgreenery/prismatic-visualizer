@@ -8,6 +8,8 @@
             margin: 0;
             padding: 0;
             height: 100%;
+            width: 100%;
+            display: flex;
             overflow: hidden;
             background: linear-gradient(
                 135deg,
@@ -93,14 +95,6 @@
         async function setup() {
             const canvas = document.getElementById('prismatic-canvas');
 
-            // Resize canvas for high-DPI displays
-            function resizeCanvas() {
-                const dpr = window.devicePixelRatio || 1;
-                canvas.width = window.innerWidth * dpr;
-                canvas.height = window.innerHeight * dpr;
-            }
-
-            resizeCanvas();
 
             // Initialize WASM module, passing canvas if supported
             const module = await init({ canvas });
