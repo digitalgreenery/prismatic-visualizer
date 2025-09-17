@@ -71,9 +71,12 @@
         /* Canvas fills viewport */
         canvas {
             display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background-color: rgba(0, 0, 0, 0);
-            width: 100vw;
-            height: 100vh;
         }
     </style>
 </head>
@@ -90,13 +93,11 @@
         async function setup() {
             const canvas = document.getElementById('prismatic-canvas');
 
-            // Resize canvas for high-DPI and mobile
+            // Resize canvas for high-DPI displays
             function resizeCanvas() {
                 const dpr = window.devicePixelRatio || 1;
                 canvas.width = window.innerWidth * dpr;
                 canvas.height = window.innerHeight * dpr;
-                canvas.style.width = window.innerWidth + 'px';
-                canvas.style.height = window.innerHeight + 'px';
             }
 
             resizeCanvas();
@@ -107,7 +108,7 @@
             // Hide loading overlay after WASM initializes
             document.getElementById('loading').style.display = 'none';
 
-            // Update canvas size on window resize
+            // Update canvas resolution on window resize
             window.addEventListener('resize', resizeCanvas);
         }
 
