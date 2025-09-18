@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prismatic Visualizer</title>
     <style>
         html, body {
             margin: 0;
             padding: 0;
             height: 100%;
-            width: 100%;
-            display: flex;
             overflow: hidden;
             background: linear-gradient(
                 135deg,
@@ -70,14 +69,11 @@
             100% { color: rgb(255,0,0); }
         }
 
-        /* Canvas fills viewport */
+        /* Canvas fills viewport using CSS only */
         canvas {
             display: block;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             background-color: rgba(0, 0, 0, 0);
         }
     </style>
@@ -95,15 +91,11 @@
         async function setup() {
             const canvas = document.getElementById('prismatic-canvas');
 
-
-            // Initialize WASM module, passing canvas if supported
+            // WASM init (your code probably sets internal resolution itself)
             const module = await init({ canvas });
 
             // Hide loading overlay after WASM initializes
             document.getElementById('loading').style.display = 'none';
-
-            // Update canvas resolution on window resize
-            window.addEventListener('resize', resizeCanvas);
         }
 
         setup();
