@@ -1,104 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prismatic Visualizer</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
         html, body {
             margin: 0;
             padding: 0;
-            height: 100%;
-            overflow: hidden;
-            background: linear-gradient(
-                135deg,
-                rgb(43, 41, 41) 0%,
-                rgb(43, 41, 41) 49%,
-                black 49%,
-                black 51%,
-                rgb(43, 41, 41) 51%,
-                rgb(43, 41, 41) 100%
-            ) repeat;
-            background-size: 20px 20px;
+            width: 100%;
+            height: 100%; /* Full height */
+            overflow: hidden; /* Prevents scrolling */
         }
 
-        /* Loading overlay */
-        #loading {
-            position: fixed;
-            top: 0;
-            left: 0;
+        #viz-iframe {
             width: 100%;
             height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(
-                135deg,
-                rgb(43, 41, 41) 0%,
-                rgb(43, 41, 41) 49%,
-                black 49%,
-                black 51%,
-                rgb(43, 41, 41) 51%,
-                rgb(43, 41, 41) 100%
-            ) repeat;
-            background-size: 20px 20px;
-            font-size: 1.5em;
-            z-index: 9999;
-            text-align: center;
-        }
-
-        #loading span {
-            font-weight: bold;
-            display: inline-block;
-            animation: colorcycle 3s linear infinite;
-        }
-
-        @keyframes colorcycle {
-            0%   { color: rgb(255,0,0); }
-            8%   { color: rgb(215,85,0); }
-            17%  { color: rgb(177,177,0); }
-            25%  { color: rgb(85,215,0); }
-            33%  { color: rgb(0,255,0); }
-            42%  { color: rgb(0,215,85); }
-            50%  { color: rgb(0,177,177); }
-            58%  { color: rgb(0,85,215); }
-            67%  { color: rgb(0,0,255); }
-            75%  { color: rgb(85,0,215); }
-            83%  { color: rgb(177,0,177); }
-            92%  { color: rgb(215,0,85); }
-            100% { color: rgb(255,0,0); }
-        }
-
-        /* Canvas fills viewport using CSS only */
-        canvas {
+            border: none;
             display: block;
-            width: 100vw;
-            height: 100vh;
-            background-color: rgba(0, 0, 0, 0);
         }
     </style>
 </head>
 <body>
-    <!-- Loading overlay -->
-    <div id="loading"><span>Loading Prismatic Visualizer…</span></div>
-
-    <!-- Canvas for WASM app -->
-    <canvas id="prismatic-canvas"></canvas>
-
-    <script type="module">
-        import init from './prismatic_visualizer.js';
-
-        async function setup() {
-            const canvas = document.getElementById('prismatic-canvas');
-
-            // WASM init (your code probably sets internal resolution itself)
-            const module = await init({ canvas });
-
-            // Hide loading overlay after WASM initializes
-            document.getElementById('loading').style.display = 'none';
-        }
-
-        setup();
-    </script>
+    <iframe id="viz-iframe" src="wasm/index.html"></iframe>
 </body>
 </html>
