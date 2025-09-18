@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prismatic Visualizer</title>
     <style>
         html, body {
+            height: 100%;
             margin: 0;
             padding: 0;
-            height: 100%;
-            overflow: hidden;
+            display: flex;
+            align-items: center; /* Center content vertically */
+            justify-content: center; /* Center content horizontally */
             background: linear-gradient(
                 135deg,
                 rgb(43, 41, 41) 0%,
@@ -20,6 +21,14 @@
                 rgb(43, 41, 41) 100%
             ) repeat;
             background-size: 20px 20px;
+            overflow: hidden; /* Hide scrollbars */
+        }
+
+        canvas {
+            width: 100%;  /* Full width of container */
+            height: auto; /* Maintain aspect ratio */
+            max-height: 100%;
+            background-color: rgb(43, 41, 41);
         }
 
         /* Loading overlay */
@@ -68,33 +77,23 @@
             92%  { color: rgb(215,0,85); }
             100% { color: rgb(255,0,0); }
         }
-
-        /* Canvas fills viewport using CSS only */
-        canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-            background-color: rgba(0, 0, 0, 0);
-        }
     </style>
 </head>
 <body>
     <!-- Loading overlay -->
-    <div id="loading"><span>Loading Prismatic Visualizer…</span></div>
-
-    <!-- Canvas for WASM app -->
-    <canvas id="prismatic-canvas"></canvas>
+    <div id="loading"><span>Loading Prismatic Visualizer...</span></div>
 
     <script type="module">
         import init from './prismatic_visualizer.js';
 
         async function setup() {
-            const canvas = document.getElementById('prismatic-canvas');
+            const module = await init();
 
-            // WASM init (your code probably sets internal resolution itself)
-            const module = await init({ canvas });
+            const canvas = document.querySelector('canvas');
+            canvas.style.width = '100vw';
+            canvas.style.height = '100vh';
 
-            // Hide loading overlay after WASM initializes
+            // Hide loading once WASM initializes
             document.getElementById('loading').style.display = 'none';
         }
 
