@@ -1,4 +1,5 @@
 use bevy::{ecs::component::Component, prelude::{ResMut, Resource}, reflect::Reflect};
+use egui_double_slider::DoubleSlider;
 use prismatic_color::{ColorModel, ColorSpace};
 use bevy_egui::{
     egui::{self,RichText},EguiContextSettings, EguiContexts, EguiPlugin, EguiPrimaryContextPass, EguiStartupSet,
@@ -140,15 +141,15 @@ impl Default for VisualizationSettings{
 pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<VisualizationSettings>) {
 
     //Create window for variable sliders
-    egui::Window::new("Spherical RGB Adjust")
+    egui::Window::new("Settings")
         .resizable(true)
-        .show(contexts.ctx_mut().unwrap(), |ui|{
-        
-        ui.label(RichText::new("Prismatic Visualizer").heading());
-        ui.separator();
+        .show(contexts.ctx_mut().unwrap(), | mut ui|{
+
+        let width = ui.available_width();
 
         ui.label("Scale");
         ui.add(egui::Slider::new( &mut settings.viz_scale ,0.0..=2.0).text("Visualization Scale"));
+        ui.separator();
 
         ui.label("Perceptual Offset");
         ui.add(egui::Slider::new( &mut settings.component_limit.0 ,0.0..=1.0).text("Red"));
@@ -172,93 +173,30 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
 
         ui.separator();
 
-        // ui.label("Color Type");
-        // ui.horizontal(|ui| {
-        //     ui.radio_value(&mut settings.is_chroma_luma, true, "HCL");
-        //     ui.radio_value(&mut settings.is_chroma_luma, false, "HWB");
-        // });
-
-        //if settings.is_chroma_luma {
-
         ui.horizontal(|ui| {
             ui.label("Channel Settings");
         });
 
         //Channel A
-        ui.horizontal(|ui| {
-            ui.label("A");
-            ui.add(egui::DragValue::new( &mut settings.channel_settings.0.steps).range( 1..=24).prefix("Steps: "));
-        });
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut settings.channel_settings.0.step_type, StepType::Forward, "Forward");
-            ui.selectable_value(&mut settings.channel_settings.0.step_type, StepType::Reverse, "Reverse");
-            if settings.channel_settings.0.steps == 1 {
-                if settings.channel_settings.0.step_type == StepType::Inclusive {
-                    settings.channel_settings.0.step_type = StepType::Forward;
-                }
-            }
-            else {
-                ui.selectable_value(&mut settings.channel_settings.0.step_type, StepType::Inclusive, "Inclusive");
-            }
-        });
-        ui.horizontal(|ui|{
-            ui.add(egui::Slider::new( &mut settings.channel_settings.0.start,0.0..=1.0).drag_value_speed(0.05).prefix("Start: "));
-            ui.add(egui::Slider::new( &mut settings.channel_settings.0.end,0.0..=2.0).drag_value_speed(0.05).prefix("End: "));
-        });
+        ui_channel(&mut ui, "C", &mut settings.channel_settings.0, width);
 
         //Channel B
-        ui.horizontal(|ui| {
-            ui.label("B");
-            ui.add(egui::DragValue::new( &mut settings.channel_settings.1.steps).range( 1..=24).prefix("Steps: "));
-
-        });
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut settings.channel_settings.1.step_type, StepType::Forward, "Forward");
-            ui.selectable_value(&mut settings.channel_settings.1.step_type, StepType::Reverse, "Reverse");
-            if settings.channel_settings.1.steps == 1 {
-                if settings.channel_settings.1.step_type == StepType::Inclusive {
-                    settings.channel_settings.1.step_type = StepType::Forward;
-                }
-            }
-            else {
-                ui.selectable_value(&mut settings.channel_settings.1.step_type, StepType::Inclusive, "Inclusive");
-            }
-        });
-        ui.horizontal(|ui|{
-            ui.add(egui::Slider::new( &mut settings.channel_settings.1.start,0.0..=1.0).drag_value_speed(0.05).prefix("Start: "));
-            ui.add(egui::Slider::new( &mut settings.channel_settings.1.end,0.0..=2.0).drag_value_speed(0.05).prefix("End: "));
-        });
+        ui_channel(&mut ui, "C", &mut settings.channel_settings.1, width);
 
         //Channel C
-        ui.horizontal(|ui| {
-            ui.label("C");
-            ui.add(egui::DragValue::new( &mut settings.channel_settings.2.steps).range( 1..=24).prefix("Steps: "));
-        });
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut settings.channel_settings.2.step_type, StepType::Forward, "Forward");
-            ui.selectable_value(&mut settings.channel_settings.2.step_type, StepType::Reverse, "Reverse");
-            if settings.channel_settings.2.steps == 1 {
-                if settings.channel_settings.2.step_type == StepType::Inclusive {
-                    settings.channel_settings.2.step_type = StepType::Forward;
-                }
-            }
-            else {
-                ui.selectable_value(&mut settings.channel_settings.2.step_type, StepType::Inclusive, "Inclusive");
-            }
-
-        });
-        ui.horizontal(|ui|{
-            ui.add(egui::Slider::new( &mut settings.channel_settings.2.start,0.0..=1.0).drag_value_speed(0.05).prefix("Start: "));
-            ui.add(egui::Slider::new( &mut settings.channel_settings.2.end,0.0..=2.0).drag_value_speed(0.05).prefix("End: "));
-        });        
+        ui_channel(&mut ui, "C", &mut settings.channel_settings.2, width);
 
         ui.separator();
 
         ui.label("Color Model");
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut settings.color_model_category, ColorModelCategory::Spherical, "Spherical");
-            ui.selectable_value(&mut settings.color_model_category, ColorModelCategory::Cubic, "Cubic");
-            ui.selectable_value(&mut settings.color_model_category, ColorModelCategory::LumaChroma, "Luma-Chroma");
+             egui::ComboBox::from_label("")
+            .selected_text(format!("{:?}", settings.color_space_model))
+            .show_ui(ui, |ui| {
+                 ui.selectable_value(&mut settings.color_model_category, ColorModelCategory::Spherical, "Spherical");
+                ui.selectable_value(&mut settings.color_model_category, ColorModelCategory::Cubic, "Cubic");
+                ui.selectable_value(&mut settings.color_model_category, ColorModelCategory::LumaChroma, "Luma-Chroma");
+            });
         });
 
         ui.separator();
@@ -283,7 +221,7 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
         let current_color_model = settings.color_model;
 
         ui.label("Color Space");
-        egui::ComboBox::from_label("Axis")
+        egui::ComboBox::from_label("")
         .selected_text(format!("{:?}", settings.color_space_model))
         .show_ui(ui, |ui| {
             ui.selectable_value(&mut settings.color_space_model, current_color_model, "Current Color Model");
@@ -300,43 +238,6 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
         });
 
         ui.horizontal(|ui| {
-
-            // let mut is_cw_prev = false;
-            // let mut is_ccw_prev = false;
-            // let mut is_cw = false;
-            // let mut is_ccw = false;
-            // match settings.model_rotation {
-            //     RotationDirection::None => {},
-            //     RotationDirection::Clockwise => {
-            //         is_cw = true;
-            //         is_cw_prev = true;
-            //     },
-            //     RotationDirection::Counterclockwise => {
-            //         is_ccw = true;
-            //         is_ccw_prev = true;
-            //     },
-            // }
-            
-            // ui.checkbox(&mut is_cw, "Rotate ↻");
-            // ui.checkbox(&mut is_ccw, "Rotate ↺");
-
-            // if is_cw && is_ccw_prev {
-            //     is_ccw = false;
-            // }
-            // if is_ccw && is_cw_prev {
-            //     is_cw = false;
-            // }
-
-            // settings.model_rotation = 
-            // if is_cw {
-            //     RotationDirection::Clockwise
-            // }
-            // else if is_ccw {
-            //     RotationDirection::Counterclockwise
-            // } 
-            // else  {
-            //     RotationDirection::None
-            // };
 
             ui.checkbox(&mut settings.model_mirrored, "Mirror");
 
@@ -399,4 +300,43 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
 
     });
 
+}
+
+fn ui_channel(ui: &mut egui::Ui, label: &str, channel: &mut ColorChannel, width: f32) {
+    // Steps
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.add(
+            egui::DragValue::new(&mut channel.steps)
+                .range(1..=24)
+                .prefix("Steps: "),
+        );
+    });
+
+    // Step type
+    ui.horizontal(|ui| {
+        ui.selectable_value(&mut channel.step_type, StepType::Forward, "Forward");
+        ui.selectable_value(&mut channel.step_type, StepType::Reverse, "Backward");
+
+        if channel.steps == 1 && channel.step_type == StepType::Inclusive {
+            channel.step_type = StepType::Forward;
+        } else {
+            ui.selectable_value(&mut channel.step_type, StepType::Inclusive, "Inclusive");
+        }
+    });
+
+    // Start/End slider
+    let mut start = channel.start;
+    let mut end = channel.end;
+
+    ui.horizontal(|ui| {
+        ui.add(
+            DoubleSlider::new(&mut start, &mut end, 0.0..=1.0)
+                .width(width)
+                .separation_distance(0.0),
+        );
+    });
+
+    channel.start = start;
+    channel.end = end;
 }

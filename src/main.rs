@@ -1,7 +1,7 @@
 //Digital Greenery
 //Prismatic Color Visualizer
 
-use bevy::{gizmos::gizmos, prelude::*, render::view::NoIndirectDrawing};
+use bevy::{prelude::*, render::view::NoIndirectDrawing};
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
 mod camera;
@@ -15,14 +15,20 @@ mod visualization;
 use visualization::{spawn_3d_visualization, VisualizationMesh, SCALE};
 
 use bevy_pointcloud::{render::PointCloudRenderMode, PointCloudPlugin};
-use bevy_pointcloud::point_cloud::{PointCloud, PointCloud3d, PointCloudData};
+use bevy_pointcloud::point_cloud::{PointCloud};
 
 use crate::ui::{ColorChannel, StepType};
 
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(DefaultPlugins.set( WindowPlugin {
+            primary_window: Some(Window {
+                title: "Prismatic Visualizer".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
         .add_plugins(EguiPlugin::default())
         .add_plugins(PointCloudPlugin)
         .add_systems(Startup, setup)
