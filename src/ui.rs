@@ -178,10 +178,10 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
         });
 
         //Channel A
-        ui_channel(&mut ui, "C", &mut settings.channel_settings.0, width);
+        ui_channel(&mut ui, "A", &mut settings.channel_settings.0, width);
 
         //Channel B
-        ui_channel(&mut ui, "C", &mut settings.channel_settings.1, width);
+        ui_channel(&mut ui, "B", &mut settings.channel_settings.1, width);
 
         //Channel C
         ui_channel(&mut ui, "C", &mut settings.channel_settings.2, width);
@@ -257,9 +257,6 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
             Dimensionality::Vertex => {
                 // ui.label("Mesh Shape");
                 ui.horizontal(|ui| {
-                    // ui.selectable_value(&mut settings.mesh_shape, VertexShape::Sphere, "Spheres");
-                    // ui.selectable_value(&mut settings.mesh_shape, VertexShape::Cube, "Cubes");
-                    // ui.selectable_value(&mut settings.mesh_shape, VertexShape::Tetrahedron, "Tetrehedrons");
                     ui.add(egui::Slider::new( &mut settings.instance_scale ,0.0..=2.0).text("Shape Scale"));
                 });
             },
@@ -276,21 +273,23 @@ pub fn ui_overlay(mut contexts: EguiContexts, mut settings: ResMut<Visualization
             Dimensionality::Face => {
                 ui.label("Quad Direction");
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut settings.face_slicing, SlicingMethod::Y, "X|Axial");
-                    ui.selectable_value(&mut settings.face_slicing, SlicingMethod::X, "Y|Radial");
+                    ui.selectable_value(&mut settings.face_slicing, SlicingMethod::X, "X|Axial");
+                    ui.selectable_value(&mut settings.face_slicing, SlicingMethod::Y, "Y|Radial");
                     ui.selectable_value(&mut settings.face_slicing, SlicingMethod::Z, "Z|Concentric");
                     ui.checkbox(&mut settings.discrete_color, "Discrete Color");
                 });
 
             },
-            Dimensionality::Volume => {},
+            Dimensionality::Volume => {
+                ui.checkbox(&mut settings.discrete_color, "Discrete Color");
+            },
         }
 
         ui.separator();
 
         // ui.label("Additional Settings");
 
-        // ui.checkbox(&mut settings.gamma_deform, "Gamma Deform");
+        ui.checkbox(&mut settings.gamma_deform, "Gamma Deform");
 
         // ui.separator();
 
